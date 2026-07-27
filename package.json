@@ -1,0 +1,45 @@
+{
+  "name": "ai-tutor",
+  "version": "1.100.0",
+  "description": "Standalone AI tutor PWA — study topics, quiz mode, flashcards, and chat",
+  "license": "MIT",
+  "author": "Mihir Bhatt",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OWNER/REPO.git"
+  },
+  "type": "module",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.0",
+    "adm-zip": "^0.6.0",
+    "better-sqlite3": "^12.11.1",
+    "cheerio": "^1.0.0",
+    "compression": "^1.8.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "mammoth": "^1.8.0",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "sql.js": "^1.12.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.8.0",
+    "globals": "17.8.0",
+    "jsdom": "^29.1.1",
+    "marked": "^9.1.6",
+    "prettier": "3.9.6"
+  }
+}

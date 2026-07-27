@@ -1,0 +1,1790 @@
+/* ── Tokens ────────────────────────────────────────────────────────────────── */
+:root {
+  --bg:      #0f1117;
+  --bg2:     #1a1d27;
+  --bg3:     #222534;
+  --border:  #2e3244;
+  --ink:     #e8e6f0;
+  --ink2:    #a0a3bc;
+  --ink3:    #5a5d74;
+  --accent:  #6c63ff;
+  --accent2: #3d3980;
+  --glow:    rgba(108,99,255,0.18);
+  --green:   #34c97a;
+  --red:     #e05555;
+  --font:    -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  --fsize:   16px;
+  --nav-h:   66px;
+  --radius:  14px;
+}
+.light {
+  --border: #c5bdb0;
+  --ink:    #18160f;
+  --ink2:   #5a5446;
+  --ink3:   #9a9080;
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:var(--fsize)}
+button{font-family:var(--font);cursor:pointer}
+textarea,input{font-family:var(--font)}
+
+/* ── App shell ─────────────────────────────────────────────────────────────── */
+.app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.main{flex:1;position:relative;overflow:hidden}
+.view{
+  position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;
+  transform:translateX(100%);
+  transition:transform .3s cubic-bezier(.4,0,.2,1);
+}
+.view.active{transform:translateX(0)}
+.view.left{transform:translateX(-30%)}
+
+/* ── Bottom nav ─────────────────────────────────────────────────────────────── */
+.bottom-nav{
+  height:var(--nav-h);display:flex;flex-shrink:0;
+  border-top:1px solid var(--border);background:var(--bg2);
+}
+.nav-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:3px;border:none;background:transparent;
+  color:var(--ink3);font-size:.7rem;letter-spacing:.02em;padding:8px 0;
+}
+.nav-btn.active{color:var(--accent)}
+.nav-ico{font-size:1.35rem;line-height:1}
+.nav-lbl{font-size:.68rem}
+
+/* ── Shared components ──────────────────────────────────────────────────────── */
+.primary-btn{
+  background:var(--accent);color:#fff;border:none;
+  padding:13px 20px;border-radius:10px;font-size:.95rem;font-weight:600;width:100%;
+}
+.cta-btn{
+  background:var(--accent);color:#fff;border:none;
+  padding:15px 28px;border-radius:12px;font-size:1rem;font-weight:700;
+  letter-spacing:.01em;
+}
+.cta-btn.full{width:100%}
+.ghost-btn{
+  background:transparent;border:1px solid var(--border);color:var(--ink2);
+  padding:8px 16px;border-radius:9px;font-size:.85rem;
+}
+a.ghost-btn{display:inline-block;text-decoration:none;text-align:center}
+.ghost-btn.wide{width:100%;padding:12px}
+.hint{color:var(--ink3);font-size:.82rem;margin-top:6px}
+
+/* ── Home / Landing ─────────────────────────────────────────────────────────── */
+.landing{
+  min-height:100%;display:flex;flex-direction:column;
+  justify-content:center;align-items:center;
+  padding:32px 24px 80px;gap:36px;
+}
+.landing-hero{text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px}
+.logo-mark{
+  font-size:3rem;color:var(--accent);line-height:1;
+  filter:drop-shadow(0 0 20px var(--glow));
+}
+.landing-title{font-size:clamp(1.5rem,5vw,2rem);font-weight:800;line-height:1.2;text-align:center}
+.landing-sub{color:var(--ink2);font-size:.95rem}
+.landing-actions{width:100%;max-width:480px;display:flex;flex-direction:column;gap:12px}
+.landing .cta-btn{width:100%}
+.landing .ghost-btn{width:100%}
+
+.no-key-banner{
+  width:100%;max-width:480px;display:flex;align-items:center;gap:10px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:10px;
+  padding:10px 14px;
+}
+.no-key-banner-text{flex:1;font-size:.82rem;color:var(--ink2);line-height:1.4}
+.no-key-banner .ghost-btn{width:auto;flex-shrink:0;padding:7px 14px;font-size:.8rem;white-space:nowrap}
+
+/* ── Wizard ─────────────────────────────────────────────────────────────────── */
+.hidden{display:none!important}
+.wizard{
+  min-height:100%;display:flex;flex-direction:column;padding:0 0 80px;
+}
+.wz-bar{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 20px;border-bottom:1px solid var(--border);
+  background:var(--bg2);flex-shrink:0;
+}
+.wz-back{
+  background:transparent;border:none;color:var(--ink2);
+  font-size:1.2rem;padding:4px 8px;border-radius:8px;
+}
+.wz-dots{display:flex;gap:8px;flex:1;justify-content:center}
+.wz-dot{
+  width:8px;height:8px;border-radius:99px;
+  background:var(--border);transition:all .25s;
+}
+.wz-dot.active{width:24px;background:var(--accent)}
+.wz-topic-chip{
+  font-size:.72rem;color:var(--ink2);font-family:monospace;
+  max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.wz-step{
+  padding:28px 22px;flex:1;
+  display:flex;flex-direction:column;gap:20px;
+}
+.wz-step:not(.active){display:none}
+.wz-step.active{display:flex}
+.wz-title{font-size:1.3rem;font-weight:800}
+.wz-sub{color:var(--ink2);font-size:.9rem;margin-top:-10px}
+.wz-input{
+  width:100%;background:var(--bg2);border:1.5px solid var(--border);
+  color:var(--ink);padding:12px 14px;border-radius:10px;font-size:.95rem;
+}
+.wz-input:focus{outline:none;border-color:var(--accent)}
+.wz-textarea{
+  width:100%;background:var(--bg2);border:1.5px solid var(--border);
+  color:var(--ink);padding:12px 14px;border-radius:10px;
+  font-size:.95rem;resize:vertical;
+}
+.wz-textarea:focus{outline:none;border-color:var(--accent)}
+.wz-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:auto;padding-top:16px}
+
+/* Source tabs */
+.src-tabs{display:flex;gap:6px}
+.src-tab{
+  padding:7px 18px;border-radius:8px;font-size:.84rem;
+  border:1px solid var(--border);background:transparent;color:var(--ink2);
+}
+.src-tab.active{background:var(--bg3);color:var(--ink);border-color:var(--accent2)}
+.src-panel{display:none}
+.src-panel.active{display:block}
+.file-drop{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;border:2px dashed var(--border);border-radius:var(--radius);
+  padding:36px 20px;cursor:pointer;color:var(--ink2);text-align:center;
+  font-size:.9rem;
+}
+.file-drop.has-file{border-color:var(--accent2);color:var(--accent)}
+.file-drop input{display:none}
+.file-icon{font-size:2rem}
+
+/* Material review / trim (file upload truncation control) */
+.material-review{
+  margin-top:12px;background:var(--bg2);border:1.5px solid var(--border);
+  border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;
+}
+.material-review.hidden{display:none}
+.material-review-note{font-size:.82rem;color:var(--ink2);line-height:1.4}
+.material-review-note.warn{color:#f0a63e}
+.material-review-foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.material-count{font-size:.74rem;color:var(--ink3);font-family:monospace}
+.material-count.warn{color:#f0a63e}
+.material-trim{display:flex;gap:6px;flex-wrap:wrap}
+.material-trim.hidden{display:none}
+.trim-btn{
+  background:transparent;border:1px solid var(--border);color:var(--ink2);
+  padding:5px 10px;border-radius:7px;font-size:.72rem;
+}
+.trim-btn:hover{border-color:var(--accent2);color:var(--ink)}
+
+/* Mode cards */
+.mode-cards{display:flex;flex-direction:column;gap:10px}
+.mode-card{
+  display:flex;align-items:center;gap:14px;
+  background:var(--bg2);border:2px solid var(--border);
+  border-radius:var(--radius);padding:16px;cursor:pointer;
+  transition:border-color .2s,background .2s;
+}
+.mode-card.selected{
+  border-color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 8%,var(--bg2));
+}
+.mode-icon{font-size:1.6rem;flex-shrink:0}
+.mode-name{font-weight:700;font-size:.95rem}
+.mode-desc{font-size:.8rem;color:var(--ink2);margin-top:2px}
+
+/* Pill rows */
+.setup-group{display:flex;flex-direction:column;gap:10px}
+.setup-label{font-weight:600;font-size:.88rem;color:var(--ink2)}
+.pill-row{display:flex;gap:8px;flex-wrap:wrap}
+.pill{
+  padding:8px 16px;border-radius:99px;font-size:.85rem;
+  border:1px solid var(--border);background:transparent;color:var(--ink2);
+  transition:all .15s;
+}
+.pill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* Loading */
+.loading-wrap{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:20px;padding:40px;
+}
+.spinner{
+  width:44px;height:44px;border-radius:50%;
+  border:3px solid var(--border);border-top-color:var(--accent);
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-msg{font-size:1rem;color:var(--ink2);text-align:center}
+.loading-checks{display:flex;flex-direction:column;gap:8px;width:100%;max-width:260px}
+.lcheck{
+  display:flex;align-items:center;gap:10px;
+  font-size:.85rem;color:var(--ink3);
+}
+.lcheck.done{color:var(--green)}
+.lcheck-icon{width:18px;text-align:center}
+
+/* ── Study tab ─────────────────────────────────────────────────────────────── */
+.study-empty{
+  height:100%;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:12px;text-align:center;padding:40px;
+}
+.empty-glyph{font-size:3rem}
+.empty-title{font-size:1.1rem;font-weight:600}
+.study-active{display:flex;flex-direction:column;height:100%}
+
+.empty-tab-prompt{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;text-align:center;padding:60px 20px;
+}
+.empty-tab-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;justify-content:center}
+
+/* ── Study tabs bar (multiple open topics/modes at once) ──────────────────── */
+.study-tabs-bar{
+  display:flex;align-items:center;gap:6px;flex-shrink:0;
+  background:var(--bg3);border-bottom:1px solid var(--border);
+  padding:6px 6px 0;
+}
+.study-tabs-scroll{
+  display:flex;gap:2px;overflow-x:auto;min-width:0;flex:1;
+  scrollbar-width:thin;
+}
+.study-tab-chip{
+  display:flex;align-items:center;gap:6px;flex-shrink:0;
+  background:var(--bg2);border:1px solid var(--border);border-bottom:none;
+  border-radius:8px 8px 0 0;padding:7px 8px 7px 11px;max-width:170px;
+  color:var(--ink2);font-size:.78rem;cursor:pointer;
+}
+.study-tab-chip.active{background:var(--bg);color:var(--ink);border-color:var(--border)}
+.tab-mode-ico{font-size:.85rem;flex-shrink:0}
+.tab-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tab-close{
+  flex-shrink:0;width:16px;height:16px;line-height:16px;text-align:center;
+  border-radius:50%;color:var(--ink3);font-size:.85rem;
+}
+.tab-close:hover{background:var(--border);color:var(--ink)}
+.study-tab-add{
+  /* Pinned to the right edge of the bar, outside the scrollable tab strip —
+     always reachable even when there are enough tabs open to overflow. */
+  flex-shrink:0;align-self:center;width:26px;height:26px;margin:0 2px 4px 0;
+  border-radius:50%;border:1px solid var(--border);background:var(--bg2);
+  color:var(--ink2);font-size:1rem;line-height:1;
+}
+.study-tab-add:hover{background:var(--bg);color:var(--accent);border-color:var(--accent)}
+.add-tab-menu{
+  position:fixed;z-index:50;background:var(--bg2);border:1px solid var(--border);
+  border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:4px;
+  display:flex;flex-direction:column;min-width:220px;
+}
+.add-tab-menu button{
+  text-align:left;padding:9px 12px;border-radius:7px;background:transparent;
+  border:none;color:var(--ink);font-size:.85rem;
+}
+.add-tab-menu button:hover{background:var(--bg3)}
+
+.study-header{
+  padding:16px 18px 12px;border-bottom:1px solid var(--border);
+  background:var(--bg2);flex-shrink:0;
+}
+.study-topic-name{font-size:1.05rem;font-weight:800;line-height:1.3}
+.study-meta{font-size:.76rem;color:var(--ink3);margin-top:3px;font-family:monospace}
+.study-header-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.manage-toggle-btn{flex-shrink:0;padding:7px 12px;font-size:.78rem}
+.status-line{font-size:.8rem;color:var(--ink2);min-height:1.1em}
+.status-line.ok{color:var(--green)}
+.status-line.err{color:var(--red)}
+
+/* ── Manage Topic panel (edit topic + questions) ──────────────────────────── */
+.topic-manage-panel{
+  padding:16px 18px;border-bottom:1px solid var(--border);
+  background:var(--bg2);flex-shrink:0;display:flex;flex-direction:column;gap:18px;
+  max-height:60vh;overflow-y:auto;
+}
+.manage-panel-header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.manage-panel-title{font-size:.95rem;font-weight:800}
+.manage-section{display:flex;flex-direction:column;gap:2px}
+.manage-h4{font-size:.82rem;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+.manage-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+.manage-actions .ghost-btn,.manage-actions .primary-btn{width:auto;padding:9px 16px}
+
+.regen-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0}
+.regen-label{font-size:.85rem;color:var(--ink2);min-width:100px}
+.regen-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.regen-buttons .gen-source-btn{width:auto;padding:7px 12px;font-size:.8rem}
+/* Neutral until clicked, same brighten/darken behavior as any other pill
+   toggle (Replace/Add-more, wizard gen-source) — .pill.active covers the
+   brighten; darken the other two once one is chosen and mid-request. */
+.gen-source-btn:disabled{opacity:.5;cursor:default}
+.gen-source-btn.active:disabled{opacity:1}
+.gen-confirm-btn{margin-top:12px}
+.gen-confirm-btn:disabled{opacity:.5;cursor:default}
+.regen-buttons .gen-confirm-btn{width:auto;padding:7px 14px;font-size:.8rem;margin-top:0}
+
+/* How many questions to pull from AI vs. local extraction — shown wherever
+   a gen-source chooser is (empty-state panels, Manage panel, wizard). */
+.count-picker{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px}
+.count-field{display:flex;flex-direction:column;gap:4px}
+.count-field-label{font-size:.78rem;color:var(--ink2)}
+.count-input{
+  width:70px;padding:7px 9px;border-radius:8px;
+  border:1px solid var(--border);background:var(--bg2);color:var(--ink);
+  font-size:.85rem;font-family:var(--font);
+}
+.count-input:focus{outline:none;border-color:var(--accent)}
+
+.mt-questions-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;max-height:280px;overflow-y:auto}
+.mt-q-row{
+  background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+  padding:10px 12px;display:flex;flex-direction:column;gap:6px;
+}
+.mt-q-row-top{display:flex;align-items:center;gap:8px}
+.mt-q-type-badge{
+  font-size:.65rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  color:var(--accent);background:var(--glow);padding:2px 7px;border-radius:99px;flex-shrink:0;
+}
+.mt-q-origin-badge{
+  font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:99px;flex-shrink:0;
+  color:var(--ink2);background:transparent;border:1px solid var(--border);
+}
+.mt-q-origin-badge.origin-ai{color:var(--accent);border-color:var(--accent2)}
+.mt-q-origin-badge.origin-local{color:var(--green);border-color:rgba(52,201,122,.4)}
+.mt-q-text{font-size:.86rem;font-weight:600;flex:1;line-height:1.3}
+.mt-q-answer{font-size:.8rem;color:var(--ink2);line-height:1.3}
+.mt-q-row-actions{display:flex;gap:6px;margin-top:2px}
+.mt-q-row-actions button{
+  background:transparent;border:1px solid var(--border);color:var(--ink2);
+  padding:4px 10px;border-radius:7px;font-size:.72rem;
+}
+.mt-q-row-actions button:hover{border-color:var(--accent2);color:var(--ink)}
+.mt-q-row-actions button.mt-q-delete:hover{border-color:#7a3325;color:#e07a5f}
+.mt-q-empty{font-size:.82rem;color:var(--ink3);padding:6px 0}
+
+.mt-question-form{
+  margin-top:10px;padding:12px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:10px;display:flex;flex-direction:column;gap:0;
+}
+.mt-question-form.hidden{display:none}
+.mt-q-edit-form{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.mt-q-edit-form input,.mt-q-edit-form textarea{
+  width:100%;background:var(--bg2);border:1.5px solid var(--border);
+  color:var(--ink);padding:8px 10px;border-radius:8px;font-size:.84rem;
+}
+.study-mode-bar{
+  display:flex;gap:0;border-bottom:1px solid var(--border);
+  background:var(--bg2);flex-shrink:0;
+}
+.mode-tab{
+  flex:1;padding:11px 8px;border:none;background:transparent;
+  color:var(--ink3);font-size:.85rem;font-weight:600;
+  border-bottom:2px solid transparent;transition:all .15s;
+}
+.mode-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.study-panels{flex:1;position:relative;overflow:hidden}
+.study-panel{
+  position:absolute;inset:0;overflow-y:auto;
+  display:none;padding:20px 18px;
+}
+.study-panel.active{display:block}
+
+/* Explain */
+.explain-body{
+  line-height:1.7;font-size:var(--fsize);
+  max-width:720px;
+}
+.explain-body h2{font-size:1.15rem;font-weight:800;margin:20px 0 8px;color:var(--accent)}
+.explain-body h3{font-size:1rem;font-weight:700;margin:16px 0 6px}
+.explain-body p{margin-bottom:12px}
+.explain-body ul,
+.explain-body ol{padding-left:20px;margin-bottom:12px}
+.explain-body li{margin-bottom:5px}
+.explain-body strong{color:var(--ink);font-weight:700}
+.explain-body code{
+  font-family:monospace;font-size:.88em;
+  background:var(--bg3);padding:2px 6px;border-radius:5px;
+}
+/* roadmap #18 — element types marked can now produce that the old regex
+   parser never did: fenced code blocks, tables, and links. */
+.explain-body pre{
+  background:var(--bg3);border-radius:8px;padding:14px 16px;
+  overflow-x:auto;margin-bottom:12px;
+}
+.explain-body pre code{background:none;padding:0;border-radius:0;font-size:.85em}
+.explain-body table{border-collapse:collapse;width:100%;margin-bottom:12px}
+.explain-body th,
+.explain-body td{border:1px solid var(--bg3);padding:6px 10px;text-align:left}
+.explain-body th{background:var(--bg3);font-weight:700}
+.explain-body .md-error{color:var(--ink2)}
+.explain-loading{
+  display:flex;flex-direction:column;align-items:center;
+  gap:16px;padding:60px 20px;color:var(--ink2);
+}
+/* roadmap #14 — raw text streamed in ahead of markdown rendering, so the
+   user sees words arrive instead of a spinner for the whole generation. */
+.explain-stream{white-space:pre-wrap}
+
+/* Follow-ups: turns the previously static explanation into a living thread —
+   the user can ask for a simpler pass, an example, a different angle, or a
+   free-form question without leaving the Explain panel or losing context. */
+#explain-followups{max-width:720px;margin-top:4px}
+.followup-qa{
+  border-top:1px dashed var(--border);padding:16px 0;
+}
+.followup-q{
+  display:inline-block;font-size:.8rem;font-weight:700;color:var(--accent);
+  background:var(--bg2);border-radius:99px;padding:4px 12px;margin-bottom:10px;
+}
+.followup-a{line-height:1.7;font-size:var(--fsize)}
+.followup-a p{margin-bottom:10px}
+.followup-a.pending{color:var(--ink3);font-style:italic}
+
+.explain-followup-bar{
+  max-width:720px;margin-top:20px;padding-top:16px;
+  border-top:1px solid var(--border);
+  display:flex;flex-direction:column;gap:10px;
+}
+.followup-chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip-btn{
+  background:var(--bg2);border:1px solid var(--border);border-radius:99px;
+  padding:6px 14px;font-size:.78rem;color:var(--ink2);
+}
+.chip-btn:hover{border-color:var(--accent);color:var(--accent)}
+.chip-btn:disabled{opacity:.5}
+.followup-input-row{display:flex;gap:8px}
+#followup-input{
+  flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+  padding:9px 12px;color:var(--ink);font-size:.9rem;font-family:var(--font);
+}
+#followup-input:focus{outline:none;border-color:var(--accent)}
+#btn-followup-send:disabled{opacity:.5}
+
+/* Flashcard */
+.flash-top,.quiz-top{
+  display:flex;align-items:center;gap:12px;margin-bottom:16px;
+}
+.counter-label{font-family:monospace;font-size:.8rem;color:var(--ink2);white-space:nowrap}
+.prog-track{flex:1;height:4px;background:var(--border);border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;background:var(--accent);transition:width .4s ease}
+.panel-exit-btn{
+  width:26px;height:26px;flex:none;border-radius:8px;
+  background:transparent;border:1px solid var(--border);color:var(--ink2);
+  font-size:.85rem;line-height:1;cursor:pointer;
+}
+.panel-exit-btn:hover{background:var(--bg2);color:var(--ink)}
+.quiz-clock{font-family:monospace;font-size:.8rem;color:var(--ink2);white-space:nowrap}
+.quiz-card.quiz-paused{opacity:.35;pointer-events:none;filter:blur(1px)}
+.card-scene{perspective:1200px}
+.flashcard{
+  width:100%;min-height:280px;
+  transform-style:preserve-3d;
+  transition:transform .55s cubic-bezier(.4,0,.2,1);
+  position:relative;
+}
+.flashcard.flipped{transform:rotateY(180deg)}
+.card-face{
+  position:absolute;inset:0;min-height:280px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:18px;
+  padding:28px 24px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px;
+  backface-visibility:hidden;
+}
+.card-face.back{transform:rotateY(180deg)}
+.face-label{
+  font-family:monospace;font-size:.72rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);
+}
+.face-text{
+  font-size:1.05rem;font-weight:600;line-height:1.5;
+  text-align:center;
+}
+.reveal-btn{
+  background:var(--glow);border:1px solid var(--accent2);
+  color:var(--accent);padding:10px 22px;border-radius:10px;font-size:.88rem;
+}
+.verdict-row{display:flex;gap:10px;width:100%}
+.vbtn{
+  flex:1;padding:12px;border-radius:10px;font-size:.9rem;font-weight:700;border:1.5px solid;
+}
+.vbtn.wrong{background:rgba(224,85,85,.1);border-color:var(--red);color:var(--red)}
+.vbtn.right{background:rgba(52,201,122,.1);border-color:var(--green);color:var(--green)}
+
+/* Quiz */
+.quiz-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:22px;display:flex;flex-direction:column;gap:16px;
+}
+.q-badge{
+  font-family:monospace;font-size:.7rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);
+}
+.q-text{font-size:1.05rem;font-weight:700;line-height:1.5}
+.q-options{display:flex;flex-direction:column;gap:8px}
+.opt-btn{
+  background:var(--bg3);border:1.5px solid var(--border);
+  color:var(--ink);padding:12px 14px;border-radius:10px;
+  font-size:.9rem;text-align:left;transition:border-color .15s;
+}
+.opt-btn:hover{border-color:var(--accent2)}
+.opt-btn.selected{background:var(--glow);border-color:var(--accent);color:var(--ink)}
+.opt-btn.correct{background:rgba(52,201,122,.1);border-color:var(--green);color:var(--green)}
+.opt-btn.wrong{background:rgba(224,85,85,.1);border-color:var(--red);color:var(--red)}
+#btn-confirm-mcq{margin-top:2px}
+#btn-confirm-mcq:disabled{opacity:.5}
+.q-open.hidden{display:none}
+.q-open{display:flex;flex-direction:column;gap:8px}
+.q-feedback.hidden{display:none}
+.q-feedback{display:flex;flex-direction:column;gap:10px}
+.q-verdict{font-size:1rem;font-weight:700}
+.q-verdict.correct{color:var(--green)}
+.q-verdict.wrong{color:var(--red)}
+.q-expl{font-size:.87rem;color:var(--ink2);line-height:1.5}
+
+/* ── Library / Bookcase ── antique grand-library theme ──────────────────────── */
+#view-library{
+  display:flex;flex-direction:column;overflow:hidden;
+  --lib-wall-1:#170b06;--lib-wall-2:#2a160c;
+  --lib-wood-1:#8a5a30;--lib-wood-2:#3c2210;--lib-wood-3:#5c3a1e;
+  --lib-floor-1:#6e4425;--lib-floor-2:#4a2c16;
+  --lib-brass:#d8b258;--lib-brass-dk:#7c5b1e;--lib-brass-hi:#f2dfa4;
+  --lib-brick-1:#8a3f28;--lib-brick-2:#5f2717;--lib-mortar:#cdb894;
+  --lib-fire-1:#ffb84d;--lib-fire-2:#ff7a29;--lib-fire-3:#ffe9b0;--lib-ember:#ff5a1f;
+  --lib-parch:#efe2c4;--lib-parch2:#c9b48a;
+  font-family:var(--font);
+}
+.lib-header{
+  flex-shrink:0;padding:12px 14px;
+  background:linear-gradient(180deg,var(--lib-wall-2),var(--lib-wall-1));
+  border-bottom:2px solid var(--lib-brass-dk);
+  box-shadow:0 2px 10px rgba(0,0,0,.4);
+}
+.search-wrap{
+  display:flex;align-items:center;gap:8px;
+  background:linear-gradient(180deg,#1a0e06,#0f0703);
+  border:1px solid var(--lib-brass-dk);border-radius:8px;
+  padding:9px 14px;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.7),inset 0 -1px 0 rgba(255,255,255,.04);
+}
+.search-ico{font-size:1rem;filter:sepia(1) saturate(2) brightness(1.15) hue-rotate(-8deg)}
+.lib-search{
+  flex:1;background:transparent;border:none;color:var(--lib-parch);
+  font-size:.9rem;font-family:var(--font);
+}
+.lib-search::placeholder{color:#8a7455}
+.lib-search:focus{outline:none}
+
+.lib-sort-select{
+  background: linear-gradient(180deg, var(--lib-brass-hi), var(--lib-brass-dk));
+  border: 1px solid var(--lib-brass-dk);
+  color: #2a1608;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .03em;
+  padding: 5px 10px;
+  border-radius: 6px;
+  box-shadow: 0 2px 5px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.5);
+  cursor: pointer;
+}
+.lib-sort-select:hover{filter:brightness(1.08)}
+.lib-sort-select:focus{outline:none}
+
+/* The wood-paneled library wall + floor that every section stands on */
+.library-scroll{
+  background:
+    radial-gradient(ellipse 65% 30% at 50% 0%, rgba(255,180,90,.05) 0%, transparent 60%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.18) 0 2px, transparent 2px 110px),
+    linear-gradient(180deg,var(--lib-wall-2) 0%,var(--lib-wall-1) 100%);
+}
+
+/* Floor: a real strip of oak plank flooring the whole room stands on — its own
+   top-shadow band reads as the baseboard where the wall meets the floor, giving
+   the room a sense of depth/distance rather than furniture floating in the wall.
+   It also carries the Courses/Topics plaques and controls (see
+   .library-floor-row below). Pinned at 15% of the screen's height and never
+   scrolled out of view — the room above it (crown + shelves + plinth) fills
+   whatever height is left above the floor, and the shelves inside it are
+   sized in JS (see layoutShelves() in app.js) to divide that height evenly
+   between however many rows there are, so the lowest shelf always lands
+   flush on the floor with no dead case space beneath it. The row is pinned
+   to the top of the floor so the labels stick right under the
+   bookshelves/fireplace above them, instead of floating in the middle of
+   the floor. */
+.library-floor{
+  position:relative;flex-shrink:0;
+  height:15vh;
+  padding:8px 0 0;
+  display:flex;flex-direction:column;justify-content:flex-start;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.45) 0%, rgba(0,0,0,.15) 18%, transparent 34%),
+    repeating-linear-gradient(90deg,
+      var(--lib-floor-1) 0 84px, var(--lib-floor-2) 84px 87px);
+  box-shadow:inset 0 4px 10px rgba(0,0,0,.6), 0 -2px 8px rgba(0,0,0,.35), 0 3px 8px rgba(0,0,0,.45);
+}
+/* Wood grain: a few faint, widely-spaced streaks per plank rather than a
+   dense repeating hatch — a real board has one or two grain lines running
+   its length, not a scanline pattern every few pixels. */
+.floor-plank{
+  position:absolute;inset:0;
+  background:repeating-linear-gradient(180deg, rgba(0,0,0,.14) 0 1px, transparent 1px 36px);
+  mix-blend-mode:multiply;opacity:.5;
+}
+
+/* Furniture frame around each bookcase: crown molding, wooden side stiles,
+   plinth base. The stiles sit outside the case's own interior, so the
+   shelves inside still run edge to edge within that interior. */
+.bookcase-frame{
+  position:relative;padding:0 14px;
+  background:linear-gradient(180deg,var(--lib-wall-2),var(--lib-wall-1));
+  box-shadow:0 14px 26px rgba(0,0,0,.5);
+  display:flex;flex-direction:column;flex:1;min-height:0;
+}
+.bookcase-frame::before,.bookcase-frame::after{
+  content:'';position:absolute;top:0;bottom:0;width:14px;
+  background:linear-gradient(90deg,var(--lib-wood-2),var(--lib-wood-1) 45%,var(--lib-wood-2));
+  box-shadow:inset 0 0 8px rgba(0,0,0,.6);
+}
+.bookcase-frame::before{left:0;border-radius:3px 0 0 3px}
+.bookcase-frame::after{right:0;border-radius:0 3px 3px 0}
+
+/* Wooden wall panel standing between each bookcase and the fireplace */
+.library-wall{
+  flex:0 0 34px;width:34px;align-self:stretch;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,.12) 0 1px, transparent 1px 17px),
+    linear-gradient(180deg,var(--lib-wall-2),var(--lib-wall-1));
+  box-shadow:inset 0 0 14px rgba(0,0,0,.5);
+}
+
+.bookcase-crown{
+  height:14px;position:relative;z-index:1;flex-shrink:0;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,.18) 0 3px, transparent 3px 9px),
+    linear-gradient(180deg,var(--lib-wood-1),var(--lib-wood-3) 60%,var(--lib-wood-2));
+  box-shadow:0 3px 8px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.15);
+  border-radius:3px 3px 0 0;
+}
+.bookcase-plinth{
+  height:16px;position:relative;z-index:1;flex-shrink:0;
+  background:linear-gradient(180deg,var(--lib-wood-3),var(--lib-wood-2));
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.5), 0 3px 8px rgba(0,0,0,.5);
+  border-radius:0 0 3px 3px;
+}
+
+.bookcase{
+  overflow-y:auto;position:relative;flex:1;min-height:0;
+  background:
+    radial-gradient(ellipse 90% 25% at 50% 0%, rgba(255,190,80,.07) 0%, transparent 55%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.1) 0 3px, transparent 3px 40px),
+    linear-gradient(180deg, #0e0703 0%, #170b05 25%, #120a04 100%);
+  box-shadow:inset 0 0 34px rgba(0,0,0,.7);
+}
+/* No center seam here — it used to read as two cabinets side by side, but
+   it ran straight through every shelf, which is exactly the kind of
+   vertical post the shelves should now run edge to edge without. */
+.ceiling-light{
+  position:sticky;top:0;height:4px;z-index:10;pointer-events:none;
+  background:radial-gradient(ellipse 60% 100% at 50% 0%,rgba(255,205,110,.26),transparent 100%);
+  box-shadow:0 0 26px 4px rgba(255,180,70,.14);
+  animation:lampFlicker 5s ease-in-out infinite;
+}
+@keyframes lampFlicker{0%,100%{opacity:1}45%{opacity:.9}50%{opacity:1}72%{opacity:.94}}
+.shelves-wrap{padding:24px 0;display:flex;flex-direction:column;gap:0}
+/* Shelves are a permanent part of the case — a fixed row of them is always
+   rendered (see renderLibrary/renderCourses), full case width, whether or
+   not there are books on them yet. 96px is a fallback for before JS has run:
+   bookStyle()/courseStyle() in app.js produce books up to 80–82px tall, plus
+   this row's 4px top padding and the book's 10px margin-bottom, so that's
+   the smallest a row can be without content stretching it taller. Once
+   rendered, layoutShelves() in app.js sets each row's actual height inline,
+   dividing the bookcase's available height evenly across all rows (never
+   less than this 96px) so the shelves both stay equally spaced AND the
+   lowest one always lands flush on the floor. */
+.shelf{
+  position:relative;
+  display:flex;align-items:flex-end;gap:3px;
+  padding:4px 0 0;
+  height:96px;
+}
+/* Wood shelf surface + edge */
+.shelf::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:10px;
+  background:linear-gradient(180deg,
+    #9a6a38 0%,#a97c42 8%,#805428 40%,#5e3c1a 75%,#3e260f 100%
+  );
+  box-shadow:0 5px 14px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.14);
+  border-radius:1px;
+}
+/* Side shadow for depth */
+.shelf::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(90deg,
+    rgba(0,0,0,.35) 0%,transparent 12%,transparent 88%,rgba(0,0,0,.35) 100%
+  );
+  z-index:1;
+}
+.book{
+  position:relative;flex-shrink:0;border-radius:1px 2px 2px 1px;
+  display:flex;align-items:center;justify-content:center;
+  writing-mode:vertical-rl;
+  cursor:pointer;z-index:2;
+  /* Sit on top of the shelf's 10px wood plank (.shelf::after), not sunk into
+     it — otherwise the book's own bottom edge covers the plank completely
+     and the book reads as floating with no shelf under it. */
+  margin-bottom:10px;
+  font-size:8px;font-weight:700;
+  color:rgba(255,255,255,.88);
+  /* Embossed/foil-stamped look: a light bevel catching the top-left plus a
+     dark one falling to the bottom-right, instead of one flat drop shadow —
+     reads as lettering pressed into (or stamped onto) the cover. */
+  text-shadow:
+    -1px -1px 1px rgba(255,255,255,.35),
+    1px 1px 2px rgba(0,0,0,.7);
+  letter-spacing:.03em;
+  overflow:hidden;
+  transition:transform .2s ease,filter .2s ease;
+  box-shadow:
+    inset 1px 0 0 rgba(255,255,255,.18),
+    2px 0 6px rgba(0,0,0,.5),
+    -1px 0 0 rgba(0,0,0,.3);
+}
+.book:hover{transform:translateY(-10px) scale(1.02);filter:brightness(1.15)}
+.book-title{
+  overflow:hidden;text-overflow:ellipsis;
+  max-height:85%;padding:1px 0;text-align:center;
+}
+
+/* ── Spine finish ──────────────────────────────────────────────────────────
+   Texture is tied one-to-one to colour now (see COVER_COLORS in app.js), not
+   picked independently: 'finish-matte' for navy/dark-magenta/crimson (a
+   worn-corner vignette over a hardcover ridge pattern — plain matte
+   leather), 'finish-velvet' for velvet red (deeper corner shadow, no ridges,
+   plus a very soft centred sheen — fabric nap catching a little light in the
+   middle rather than a hard highlight), 'finish-metallic' for emerald green
+   (diagonal brushed-metal shine streaks over the corner vignette). All three
+   layer on top of `--spine-base` — the book's own colour plus its trim
+   band(s), fully computed per-title in computeSpineStyle()/
+   buildSpineLayers() in app.js and passed in as a CSS custom property
+   (itself possibly several comma-separated gradient layers — substitution
+   is textual, so it just splices in as more layers here). */
+.book.finish-matte{
+  background:
+    radial-gradient(circle at 0% 0%, rgba(0,0,0,.4), transparent 38%),
+    radial-gradient(circle at 100% 0%, rgba(0,0,0,.4), transparent 38%),
+    radial-gradient(circle at 0% 100%, rgba(0,0,0,.4), transparent 38%),
+    radial-gradient(circle at 100% 100%, rgba(0,0,0,.4), transparent 38%),
+    repeating-linear-gradient(180deg,
+      transparent 0 16%, rgba(0,0,0,.32) 16% 17.3%, transparent 17.3% 22%),
+    var(--spine-base);
+}
+.book.finish-velvet{
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255,255,255,.05), transparent 55%),
+    radial-gradient(circle at 0% 0%, rgba(0,0,0,.55), transparent 42%),
+    radial-gradient(circle at 100% 0%, rgba(0,0,0,.55), transparent 42%),
+    radial-gradient(circle at 0% 100%, rgba(0,0,0,.55), transparent 42%),
+    radial-gradient(circle at 100% 100%, rgba(0,0,0,.55), transparent 42%),
+    var(--spine-base);
+}
+.book.finish-metallic{
+  background:
+    linear-gradient(155deg,
+      rgba(255,255,255,.3) 0%, transparent 14%,
+      transparent 38%, rgba(255,255,255,.18) 52%, transparent 66%,
+      transparent 82%, rgba(255,255,255,.26) 94%, transparent 100%),
+    radial-gradient(circle at 0% 0%, rgba(0,0,0,.35), transparent 40%),
+    radial-gradient(circle at 100% 0%, rgba(0,0,0,.35), transparent 40%),
+    radial-gradient(circle at 0% 100%, rgba(0,0,0,.35), transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(0,0,0,.35), transparent 40%),
+    var(--spine-base);
+}
+.lib-empty{
+  position:absolute;inset:0;z-index:3;pointer-events:none;
+  color:var(--lib-parch2);text-align:center;padding:60px 30px;
+  display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;
+  font-style:italic;
+}
+.lib-empty strong{color:var(--lib-brass)}
+
+/* ── Settings ───────────────────────────────────────────────────────────────── */
+.settings-scroll{padding:24px 20px 80px;display:flex;flex-direction:column;gap:28px}
+.settings-title{font-size:1.3rem;font-weight:800}
+.settings-section{display:flex;flex-direction:column;gap:16px}
+.section-label{
+  font-size:.7rem;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink3);padding-bottom:4px;
+  border-bottom:1px solid var(--border);
+}
+.setting-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.setting-row.col{flex-direction:column;align-items:flex-start;gap:10px}
+.setting-key{font-size:.9rem;color:var(--ink2)}
+.setting-select{
+  background:var(--bg3);border:1px solid var(--border);color:var(--ink);
+  padding:7px 12px;border-radius:8px;font-size:.88rem;font-family:var(--font);
+}
+.apikey-row{display:flex;gap:8px;width:100%}
+.apikey-row .wz-input{flex:1}
+.apikey-row .primary-btn{width:auto;padding:0 18px;flex-shrink:0}
+.apikey-links{display:flex;align-items:center;gap:14px;width:100%}
+.apikey-links a{color:var(--accent);font-size:.82rem;text-decoration:none}
+.apikey-links a:hover{text-decoration:underline}
+.apikey-links .ghost-btn{margin-left:auto;padding:6px 14px;font-size:.8rem}
+#apikey-status.ok{color:var(--green)}
+#apikey-status.err{color:var(--red)}
+
+.size-row{display:flex;align-items:center;gap:10px;flex:1;justify-content:flex-end}
+.size-a{color:var(--ink2)}
+.size-a.small{font-size:.8rem}
+.size-a.large{font-size:1.2rem}
+.size-range{
+  flex:1;max-width:120px;
+  accent-color:var(--accent);
+}
+.size-val{font-family:monospace;font-size:.8rem;color:var(--ink3);min-width:32px;text-align:right}
+/* Toggle */
+.toggle{position:relative;cursor:pointer}
+.toggle input{display:none}
+.toggle-track{
+  display:block;width:46px;height:26px;border-radius:99px;
+  background:var(--border);transition:background .2s;
+}
+.toggle input:checked ~ .toggle-track{background:var(--accent)}
+.toggle-thumb{
+  position:absolute;top:3px;left:3px;
+  width:20px;height:20px;border-radius:50%;background:#fff;
+  transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.3);
+}
+.toggle input:checked ~ .toggle-track .toggle-thumb{transform:translateX(20px)}
+/* Swatches */
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.swatch{
+  width:30px;height:30px;border-radius:8px;border:2px solid transparent;
+  background:var(--sc);transition:transform .15s;
+  display:flex;align-items:center;justify-content:center;
+}
+.swatch:hover{transform:scale(1.12)}
+.swatch.active{outline:2px solid var(--accent);outline-offset:2px}
+.swatch.custom{
+  background:var(--bg3);color:var(--ink2);font-size:1rem;
+  border:1px solid var(--border);cursor:pointer;
+  position:relative;overflow:hidden;
+}
+.swatch.custom input{
+  position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;
+}
+
+/* ── Wizard step 2 additions ─────────────────────────────────────────────── */
+.setup-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.skip-link {
+  background: var(--bg3);
+  border: 1.5px solid var(--accent2);
+  color: var(--accent);
+  font-size: .78rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 6px;
+  letter-spacing: .02em;
+}
+.skip-link:hover { background: var(--glow); }
+
+.skipped-note {
+  font-size: .78rem;
+  color: var(--ink3);
+  font-style: italic;
+  margin-top: 4px;
+}
+.skipped-note.hidden { display: none; }
+
+.time-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.time-input-part {
+  width: 56px;
+  background: var(--bg2);
+  border: 1.5px solid var(--border);
+  color: var(--ink);
+  padding: 12px 8px;
+  border-radius: 10px;
+  font-size: 1.2rem;
+  font-family: monospace;
+  text-align: center;
+  /* Hide the native up/down steppers so this reads as a plain digit field
+     while still bringing up a numeric keypad on mobile via inputmode. */
+  -moz-appearance: textfield;
+}
+.time-input-part::-webkit-outer-spin-button,
+.time-input-part::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.time-input-part:focus { outline: none; border-color: var(--accent); }
+.time-input-part.skipped { opacity: .35; pointer-events: none; }
+.time-colon {
+  font-size: 1.2rem;
+  font-family: monospace;
+  color: var(--ink3);
+}
+.time-label {
+  font-size: .8rem;
+  color: var(--ink3);
+  letter-spacing: .06em;
+}
+
+/* ── Loading cancel button ───────────────────────────────────────────────── */
+#btn-cancel-session {
+  opacity: 0;
+  transition: opacity .4s;
+  pointer-events: none;
+}
+#btn-cancel-session.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Version badge ────────────────────────────────────────────────────────── */
+.version-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: .72rem;
+  color: var(--accent);
+  background: var(--glow);
+  border: 1px solid var(--accent2);
+  border-radius: 6px;
+  padding: 3px 10px;
+  letter-spacing: .06em;
+  margin-top: 4px;
+}
+
+/* ── Library tab toggle ───────────────────────────────────────────────────── */
+.lib-tab-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.lib-view-tab {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink3);
+  font-size: .83rem;
+  font-weight: 600;
+  transition: all .15s;
+}
+.lib-view-tab.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* ── Courses panel ────────────────────────────────────────────────────────── */
+.courses-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg);
+}
+.courses-panel.hidden { display: none; }
+.courses-toolbar { display: flex; justify-content: flex-end; }
+
+.new-course-form {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.new-course-form.hidden { display: none; }
+
+.courses-list { display: flex; flex-direction: column; gap: 12px; }
+
+/* Course card */
+.course-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.course-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.course-name { font-weight: 800; font-size: 1rem; }
+.course-desc { font-size: .8rem; color: var(--ink2); margin-top: 2px; }
+.course-stats { font-family: var(--mono); font-size: .75rem; color: var(--ink3); white-space: nowrap; }
+
+.syllabus-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.syllabus-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg3);
+  font-size: .85rem;
+  cursor: pointer;
+  transition: background .15s;
+}
+.syllabus-item:hover { background: color-mix(in srgb, var(--accent) 10%, var(--bg3)); }
+.syllabus-num {
+  font-family: var(--mono);
+  font-size: .72rem;
+  color: var(--ink3);
+  min-width: 18px;
+}
+.syllabus-name { flex: 1; font-weight: 600; }
+.syllabus-status {
+  font-size: .75rem;
+  font-family: var(--mono);
+}
+.syllabus-status.done  { color: var(--green); }
+.syllabus-status.open  { color: var(--ink3); }
+.syllabus-status.locked { color: var(--red); }
+
+.course-actions {
+  display: flex;
+  gap: 8px;
+}
+.course-btn {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  padding: 8px 6px;
+  border-radius: 8px;
+  font-size: .78rem;
+  text-align: center;
+}
+.course-btn:hover { border-color: var(--accent2); color: var(--accent); }
+.course-btn.danger { color: var(--red); }
+.course-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Add topic to course sheet */
+.add-topic-sheet {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 8px;
+  display: none;
+}
+.add-topic-sheet.open { display: block; }
+.topic-check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 10px 0;
+}
+.topic-check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg3);
+  cursor: pointer;
+  font-size: .87rem;
+}
+.topic-check-item input[type="checkbox"] { accent-color: var(--accent); }
+
+/* Study guide panel */
+.guide-panel {
+  padding: 20px 18px;
+  overflow-y: auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.guide-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.guide-title { font-weight: 800; font-size: 1.05rem; }
+.download-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--ink2);
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: .8rem;
+}
+.download-btn:hover { border-color: var(--accent2); color: var(--accent); }
+
+/* ── Home topbar (version badge) ─────────────────────────────────────────── */
+.home-header {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 14px 0;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.home-header .version-badge { pointer-events: auto; }
+
+/* ── Library layout: bookshelf | wall | fireplace | wall | bookshelf, full width, on one floor ── */
+.library-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.library-room {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.bookcase-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Floor row: mirrors .library-room's column widths exactly (shelf / wall /
+   fireplace / wall / shelf) so each plaque and control lines up directly
+   under the bookcase or chimney it belongs to. */
+.library-floor-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+}
+.floor-slot-shelf {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.floor-slot-wall {
+  flex: 0 0 34px;
+  width: 34px;
+}
+.floor-slot-fireplace {
+  flex: 0 0 40%;
+}
+
+.bookcase-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 4px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bookcase-section-title { display:inline-flex; }
+.plaque {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  font-size: .85rem;
+  color: #2a1608;
+  background: linear-gradient(180deg, var(--lib-brass-hi) 0%, var(--lib-brass) 45%, var(--lib-brass-dk) 100%);
+  padding: 6px 18px;
+  border-radius: 3px;
+  box-shadow:
+    0 2px 6px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.5),
+    inset 0 -2px 3px rgba(0,0,0,.3);
+  text-shadow: 0 1px 0 rgba(255,255,255,.35);
+}
+.bookcase-new-btn {
+  background: linear-gradient(180deg, var(--lib-brass-hi), var(--lib-brass-dk));
+  border: 1px solid var(--lib-brass-dk);
+  color: #2a1608;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .03em;
+  padding: 5px 14px;
+  border-radius: 6px;
+  box-shadow: 0 2px 5px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.bookcase-new-btn:hover { filter: brightness(1.08); }
+
+/* Courses bookcase — slightly warmer ceiling light to distinguish it */
+.bookcase-courses .ceiling-light {
+  background: radial-gradient(ellipse 90% 100% at 50% 0%,
+    rgba(255,150,50,.16) 0%, transparent 100%);
+  box-shadow: 0 0 26px 4px rgba(255,130,40,.16);
+}
+
+/* New course form — a popover anchored above the "+ New" button (inside
+   .floor-slot-shelf, its positioned ancestor) rather than sitting inline in
+   the floor row: the floor row is only ~15% of the screen tall, nowhere
+   near enough for this form's fields, so inline it forced a scroll to see
+   the whole thing. Floating it above the button keeps it fully on screen
+   regardless of the floor's height. Left-aligned rather than centered on
+   the column — the Courses column sits at the screen's left edge, so
+   centering on it would push the popover half off-screen. */
+.new-course-form {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  margin-bottom: 10px;
+  width: min(320px, 90vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  z-index: 40;
+  background: linear-gradient(180deg,var(--lib-wall-2),var(--lib-wall-1));
+  border: 1px solid var(--lib-brass-dk);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0,0,0,.55);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.new-course-form.hidden { display: none; }
+
+/* Course detail panel — a popover anchored next to whichever course book
+   was clicked (see positionPopoverNear() in app.js), like a card catalogue
+   slip pulled out next to the book on the shelf. Previously sat inline in
+   the floor row, which put it "under" the Courses header — off in a
+   15vh-tall strip nowhere near the book that opened it — and its
+   open/close reflowed that row's layout every time, which is what made
+   nearby books visibly jump/glitch. A fixed-position overlay never touches
+   surrounding layout, so nothing else can be disturbed by it opening. */
+.course-detail-panel {
+  position: fixed;
+  z-index: 150;
+  width: min(360px, 92vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  border-radius: 10px;
+  background: linear-gradient(180deg,#241108,#170b05);
+  border: 1px solid var(--lib-brass-dk);
+  box-shadow: 0 16px 40px rgba(0,0,0,.55);
+  padding: 14px 16px;
+  animation: slideDown .2s ease;
+  color: var(--lib-parch);
+}
+.course-detail-panel.hidden { display: none; }
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.course-detail-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: var(--lib-brass-hi);
+  margin-bottom: 4px;
+}
+.course-detail-desc {
+  font-size: .8rem;
+  color: var(--lib-parch2);
+  margin-bottom: 12px;
+}
+/* Permanently visible rather than hover-revealed — that made sense when
+   this panel sat passively inline in the floor row, but now that it's a
+   popover you deliberately opened by clicking a book, hiding its own
+   actions behind a hover just makes them hard to find (and doesn't work
+   with touch at all without the separate no-hover fallback this replaced). */
+.course-detail-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.cd-btn {
+  flex: 1;
+  min-width: 80px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--lib-brass-dk);
+  color: var(--lib-parch);
+  padding: 8px 8px;
+  border-radius: 8px;
+  font-size: .78rem;
+  text-align: center;
+}
+.cd-btn:hover { border-color: var(--lib-brass); color: var(--lib-brass-hi); }
+.cd-btn.primary-cd { background: linear-gradient(180deg,var(--lib-brass-hi),var(--lib-brass-dk)); color: #2a1608; border-color: var(--lib-brass-dk); font-weight:700; }
+.cd-btn.danger-cd  { color: #e07a5f; border-color: #7a3325; }
+
+/* Mode picker — shown when a topic book (or a course's topic-list row) is
+   clicked. The card is positioned next to whichever book triggered it (see
+   positionPopoverNear() in app.js), same popover treatment as
+   .course-detail-panel below — falls back to this centered position (via
+   CSS only, no JS) if it's ever shown without a trigger element. Clamped to
+   the viewport in JS so a book right at a shelf's edge still shows the
+   card fully on screen instead of clipped.
+   Styled to match .course-detail-panel's library theme (brass/parchment)
+   rather than the app's general dark-UI card — colors are hardcoded rather
+   than pulled from the --lib-* custom properties because this markup lives
+   outside #view-library (deliberately, so position:fixed centers on the
+   real viewport instead of being caught by that view's CSS transform),
+   which is where those variables are scoped. */
+.mode-picker-overlay {
+  position: fixed; inset: 0; z-index: 200;
+}
+.mode-picker-overlay.hidden { display: none; }
+.mode-picker-card {
+  position: fixed;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(320px, calc(100vw - 20px));
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px;
+  background: linear-gradient(180deg,#241108,#170b05);
+  border: 1px solid #7c5b1e;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.5);
+}
+.mode-picker-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 800; font-size: 1.2rem; text-align: center;
+  margin-bottom: 4px; color: #f2dfa4;
+}
+.mode-picker-option {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid #7c5b1e;
+  border-radius: 8px;
+  font-size: .95rem; color: #efe2c4; text-align: left;
+}
+.mode-picker-option:hover { border-color: #d8b258; color: #f2dfa4; background: rgba(255,255,255,.07); }
+.mp-ico { font-size: 1.1rem }
+.mode-picker-cancel {
+  margin-top: 4px; background: none; border: none;
+  color: #c9b48a; font-size: .85rem; padding: 6px;
+}
+.mode-picker-cancel:hover { color: #efe2c4 }
+
+/* ── Course/topic/question stats popups ───────────────────────────────────── */
+/* Reuses .mode-picker-card as the popup shell; these are just its rows. */
+.stats-popup-card { text-align: left; }
+.stat-bar-row { display: flex; align-items: center; gap: 10px; }
+.stat-bar-label {
+  flex: 0 0 auto; width: 42%;
+  font-size: .82rem; color: #efe2c4;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.stat-bar-track {
+  flex: 1; height: 8px; border-radius: 5px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(216,178,88,.25);
+  overflow: hidden;
+}
+.stat-bar-fill {
+  height: 100%; border-radius: 5px;
+  background: linear-gradient(90deg,#7c5b1e,#d8b258);
+}
+.stat-bar-pct {
+  flex: 0 0 auto; min-width: 36px; text-align: right;
+  font-family: var(--mono); font-size: .78rem; color: #d8b258;
+}
+.stat-breakdown {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 2px; padding-top: 10px;
+  border-top: 1px solid rgba(216,178,88,.15);
+  max-height: 240px; overflow-y: auto;
+}
+.stat-breakdown.hidden { display: none; }
+
+.detail-topic-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+.detail-topic-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(216,178,88,.15);
+  font-size: .84rem;
+  cursor: pointer;
+}
+.detail-topic-row:hover { background: rgba(216,178,88,.1); border-color: var(--lib-brass-dk); }
+.dtr-num  { font-family: var(--mono); font-size: .7rem; color: var(--lib-parch2); min-width: 16px; }
+.dtr-name { flex: 1; font-weight: 600; }
+.dtr-stat { font-family: var(--mono); font-size: .72rem; }
+.dtr-stat.done   { color: #7fbf6a; }
+.dtr-stat.locked { color: #e07a5f; }
+.dtr-stat.open   { color: var(--lib-parch2); }
+
+/* Add-topics sheet inside detail panel */
+.add-topics-wrap {
+  margin-top: 10px;
+  background: rgba(0,0,0,.25);
+  border: 1px solid var(--lib-brass-dk);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: none;
+}
+.add-topics-wrap.open { display: block; }
+.topic-check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 8px 0;
+}
+.topic-check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: rgba(255,255,255,.04);
+  border-radius: 7px;
+  font-size: .85rem;
+  cursor: pointer;
+}
+.topic-check-item input[type="checkbox"] { accent-color: var(--lib-brass); }
+
+/* Course books are slightly more prominent (rounder spine) — width itself
+   comes from courseStyle()'s own (already wider) formula, quartered same as
+   topic books, so no min-width override here */
+.book.course-book {
+  border-radius: 1px 2px 2px 1px;
+}
+
+/* ── Fireplace divider — an old brick chimney standing between the two bookcase walls ── */
+.library-fireplace{
+  position:relative;display:flex;flex-direction:column;align-items:center;
+  flex:0 0 40%;min-height:0;
+  background:linear-gradient(180deg,var(--lib-wall-2),var(--lib-wall-1));
+  box-shadow:inset 10px 0 16px -10px rgba(0,0,0,.6), inset -10px 0 16px -10px rgba(0,0,0,.6);
+}
+.fireplace-chimney{
+  width:56%;flex:1 1 auto;min-height:80px;position:relative;overflow:hidden;
+  box-shadow:inset 0 0 20px rgba(0,0,0,.45);
+}
+.fireplace-bricks{
+  position:absolute;inset:0;
+  background-color:var(--lib-mortar);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='30'%3E%3Crect x='1' y='1' width='28' height='12' fill='%238a3f28'/%3E%3Crect x='31' y='1' width='28' height='12' fill='%235f2717'/%3E%3Crect x='-14' y='16' width='28' height='12' fill='%235f2717'/%3E%3Crect x='16' y='16' width='28' height='12' fill='%238a3f28'/%3E%3Crect x='46' y='16' width='28' height='12' fill='%235f2717'/%3E%3C/svg%3E");
+  background-size:60px 30px;
+  box-shadow:inset 0 8px 14px rgba(0,0,0,.4), inset 0 -4px 8px rgba(0,0,0,.3);
+}
+.fireplace-mantel{
+  width:88%;max-width:440px;height:18px;margin-top:-1px;
+  background:linear-gradient(180deg,var(--lib-wood-1),var(--lib-wood-2));
+  box-shadow:0 5px 12px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.18);
+  border-radius:2px;position:relative;z-index:2;
+  display:flex;align-items:center;justify-content:center;
+}
+.mantel-plaque{ color:var(--lib-brass); font-size:1rem; text-shadow:0 0 6px rgba(216,178,88,.5) }
+.fireplace-surround{
+  width:80%;max-width:380px;margin-top:-2px;padding:14px 14px 0;
+  background-color:var(--lib-mortar);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='30'%3E%3Crect x='1' y='1' width='28' height='12' fill='%238a3f28'/%3E%3Crect x='31' y='1' width='28' height='12' fill='%235f2717'/%3E%3Crect x='-14' y='16' width='28' height='12' fill='%235f2717'/%3E%3Crect x='16' y='16' width='28' height='12' fill='%238a3f28'/%3E%3Crect x='46' y='16' width='28' height='12' fill='%235f2717'/%3E%3C/svg%3E");
+  background-size:60px 30px;
+  border-radius:2px 2px 0 0;
+  box-shadow:inset 0 0 24px rgba(0,0,0,.6);
+  display:flex;justify-content:center;
+}
+.fireplace-firebox{
+  width:100%;max-width:280px;height:96px;position:relative;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 115%, #3a1206 0%, #180804 55%, #0a0402 80%);
+  border-radius:50% 50% 4px 4px / 65% 65% 4px 4px;
+  box-shadow:inset 0 0 30px rgba(0,0,0,.85), 0 0 55px 16px rgba(255,120,40,.35);
+}
+
+/* Soft diffuse bloom sitting behind the flames — this is what sells the room
+   glow instead of the flames reading as isolated shapes on a black backdrop */
+.fireplace-glow{
+  position:absolute;left:50%;bottom:4px;transform:translateX(-50%);
+  width:100%;height:78%;border-radius:50%;
+  background:radial-gradient(ellipse at 50% 100%, rgba(255,170,70,.6), rgba(255,90,20,.28) 45%, transparent 75%);
+  filter:blur(9px);
+  mix-blend-mode:screen;
+  z-index:0;
+  animation:fireGlowPulse 2.4s ease-in-out infinite;
+}
+@keyframes fireGlowPulse{
+  0%,100%{ opacity:.7; transform:translateX(-50%) scale(1); }
+  35%{ opacity:1; transform:translateX(-50%) scale(1.07); }
+  60%{ opacity:.82; transform:translateX(-50%) scale(.97); }
+}
+
+/* Crossed logs — bark gradient with charred ends, stacked so they read as a
+   real pile rather than one flat stick candles are balanced on */
+.fireplace-log{
+  position:absolute;left:50%;bottom:6px;
+  height:10px;border-radius:6px;
+  background:linear-gradient(90deg,#140a05 0%,#3c2313 10%,#7a4a26 40%,#5c3a1e 58%,#2e1a0d 88%,#120904 100%);
+  box-shadow:0 3px 6px rgba(0,0,0,.65),inset 0 1px 1px rgba(255,255,255,.1),inset 0 -2px 3px rgba(0,0,0,.55);
+  z-index:1;
+}
+.fireplace-log.log-a{ width:76%; bottom:11px; transform:translateX(-50%) rotate(-5deg); }
+.fireplace-log.log-b{ width:70%; bottom:5px;  transform:translateX(-50%) rotate(4deg); }
+.fireplace-log.log-c{ width:46%; left:40%; bottom:15px; height:9px; transform:rotate(-16deg); z-index:3; }
+
+/* Embers glowing beneath/between the logs, pulsing independently of the flames */
+.fireplace-embers{
+  position:absolute;left:50%;bottom:4px;transform:translateX(-50%);
+  width:60%;height:9px;border-radius:50%;
+  background:radial-gradient(ellipse, var(--lib-ember) 0%, #ff8a3d 40%, transparent 75%);
+  filter:blur(2px);
+  z-index:1;
+  animation:emberPulse 1.3s ease-in-out infinite alternate;
+}
+@keyframes emberPulse{ from{ opacity:.55; transform:translateX(-50%) scale(.92); } to{ opacity:1; transform:translateX(-50%) scale(1.05); } }
+
+/* Fire — three overlapping teardrop "licks" plus a brighter core, each cut
+   from a square with one sharp corner (border-radius) rotated up to a
+   point, not traced from any emoji or icon glyph. Real flame never reads as
+   one clean drop, so three of them overlap at slightly different sizes,
+   angles and rhythms, with a small bright core layered on top for the
+   classic dark-edge/light-centre look — inspired by how fire is drawn as a
+   silhouette, not a copy of a specific one. Each lick's own keyframes swing
+   its rotation and stretch it vertically around a fixed base (its
+   transform-origin), which reads as flicker without ever going near a
+   straight edge.
+   `.fireplace-flame` is a zero-size anchor at the flame's base — every lick
+   is centered on it via left:0 + a negative margin-left of half its own
+   width, so this whole cluster stays perfectly centered regardless of how
+   many licks there are or how wide each one is. */
+.fireplace-flame{
+  position:absolute;left:50%;bottom:2px;width:0;height:0;z-index:2;
+}
+/* A second copy of the same cluster, mirrored and shrunk, anchored at the
+   exact same base point as the original (not offset) so both read as one
+   fuller flame fanning out symmetrically from a single point at the logs,
+   rather than two separate plumes side by side — same shapes, same
+   keyframes, just flipped with scale(-x, y) and nudged out of phase via
+   animation-delay so the two halves never flicker in lockstep. */
+.fireplace-flame.flame-secondary{
+  left:50%;
+  transform:scale(-.78,.82);
+  z-index:1;
+}
+.flame-secondary .flame-lick,
+.flame-secondary .flame-core{
+  animation-delay:-1.4s;
+}
+.flame-lick,.flame-core{
+  position:absolute;left:0;bottom:0;
+  border-radius:0% 50% 50% 50%;
+  transform-origin:50% 100%;
+}
+.lick-a{
+  width:30px;height:48px;margin-left:-38px;
+  background:linear-gradient(200deg,var(--lib-fire-2),var(--lib-fire-1) 75%);
+  opacity:.8;
+  animation:flameSwayA 2.7s ease-in-out infinite;
+}
+.lick-c{
+  width:30px;height:52px;margin-left:6px;
+  background:linear-gradient(200deg,var(--lib-fire-2),var(--lib-fire-1) 75%);
+  opacity:.8;
+  animation:flameSwayC 2.3s ease-in-out infinite;
+}
+.lick-b{
+  width:44px;height:74px;margin-left:-22px;
+  background:linear-gradient(200deg,var(--lib-fire-2) 0%,var(--lib-fire-1) 55%,var(--lib-fire-3) 100%);
+  box-shadow:0 0 26px 8px rgba(255,120,40,.4);
+  animation:flameSwayB 2.9s ease-in-out infinite;
+}
+.flame-core{
+  width:26px;height:44px;margin-left:-13px;bottom:3px;
+  background:linear-gradient(200deg,var(--lib-fire-1) 0%,var(--lib-fire-3) 55%,#fff6da 100%);
+  animation:flameSwayCore 2.1s ease-in-out infinite;
+}
+@keyframes flameSwayA{
+  0%,100%{ transform:rotate(34deg) scaleY(1); opacity:.74; }
+  50%{ transform:rotate(41deg) scaleY(1.08); opacity:.9; }
+}
+@keyframes flameSwayC{
+  0%,100%{ transform:rotate(56deg) scaleY(1); opacity:.74; }
+  50%{ transform:rotate(48deg) scaleY(1.07); opacity:.9; }
+}
+@keyframes flameSwayB{
+  0%,100%{ transform:rotate(45deg) scaleY(1); }
+  40%{ transform:rotate(50deg) scaleY(1.06); }
+  70%{ transform:rotate(39deg) scaleY(.95); }
+}
+@keyframes flameSwayCore{
+  0%,100%{ transform:rotate(45deg) scaleY(1); }
+  45%{ transform:rotate(39deg) scaleY(1.1); }
+  75%{ transform:rotate(50deg) scaleY(.92); }
+}
+@media (prefers-reduced-motion: reduce){
+  .flame-lick,.flame-core{ animation:none !important; }
+}
+/* Thin haze curling up off the flames — kept low-opacity and inside the
+   firebox so it reads as heat/smoke rather than floating debris */
+.fireplace-smoke{
+  position:absolute;bottom:60px;left:50%;
+  width:12px;height:22px;border-radius:50%;
+  background:radial-gradient(ellipse, rgba(210,200,190,.30), transparent 75%);
+  filter:blur(3px);
+  z-index:1;
+  pointer-events:none;
+  animation:smokeRise 4.2s ease-in infinite;
+}
+.fireplace-smoke.s1{ left:40%; animation-delay:.3s; }
+.fireplace-smoke.s2{ left:58%; width:10px; animation-duration:5s; animation-delay:1.8s; }
+@keyframes smokeRise{
+  0%{ transform:translate(-50%,0) scale(.6); opacity:0; }
+  18%{ opacity:.45; }
+  100%{ transform:translate(-65%,-58px) scale(1.7); opacity:0; }
+}
+
+/* Sparks popping off the embers and drifting up, fading as they cool */
+.fireplace-spark{
+  position:absolute;bottom:14px;left:50%;
+  width:2px;height:2px;border-radius:50%;
+  background:var(--lib-fire-3);
+  box-shadow:0 0 5px 1px var(--lib-fire-1);
+  z-index:4;
+  animation:sparkRise 2.6s ease-in infinite;
+}
+.fireplace-spark.sp1{ left:46%; }
+.fireplace-spark.sp2{ left:38%; animation-delay:.8s; animation-duration:3.1s; }
+.fireplace-spark.sp3{ left:62%; animation-delay:1.6s; animation-duration:2.3s; }
+@keyframes sparkRise{
+  0%{ transform:translate(-50%,0) scale(1); opacity:0; }
+  12%{ opacity:1; }
+  70%{ opacity:.7; }
+  100%{ transform:translate(-50%,-72px) scale(.3); opacity:0; }
+}
+
+.fireplace-hearth{
+  width:90%;max-width:400px;height:14px;margin-top:0;
+  background:linear-gradient(180deg,#948a7c,#645b4d);
+  border-radius:2px;position:relative;z-index:1;
+  box-shadow:0 4px 10px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.15);
+}
+
+/* Warm under-light on the mantel catching the fire below, breathing in sync
+   with the room-wide glow so the whole corner feels lit by one source */
+.fireplace-mantel::after{
+  content:'';position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);
+  width:70%;height:14px;
+  background:radial-gradient(ellipse at 50% 0%, rgba(255,150,60,.4), transparent 75%);
+  filter:blur(4px);
+  pointer-events:none;
+  animation:roomFireGlow 2.2s ease-in-out infinite;
+}
+
+/* Firelight bleeding out across the whole room, brightest near the hearth and
+   fading into the bookcases either side — this is what makes the fire feel
+   like a light source instead of a decoration boxed inside the chimney */
+.library-room::after{
+  content:'';
+  position:absolute;inset:0;pointer-events:none;z-index:5;
+  background:radial-gradient(ellipse 60% 60% at 50% 100%, rgba(255,140,55,.32), transparent 68%);
+  mix-blend-mode:screen;
+  animation:roomFireGlow 2.2s ease-in-out infinite;
+}
+@keyframes roomFireGlow{
+  0%,100%{ opacity:.7; }
+  30%{ opacity:1; }
+  55%{ opacity:.82; }
+  75%{ opacity:.95; }
+}
+
+/* Soft cinematic vignette across the whole library, deepening the sense of
+   a room lit only by the hearth rather than a flat backdrop */
+#view-library::after{
+  content:'';
+  position:absolute;inset:0;pointer-events:none;z-index:30;
+  background:radial-gradient(ellipse 78% 68% at 50% 55%, transparent 38%, rgba(0,0,0,.58) 100%);
+}
+
+@media (prefers-reduced-motion: reduce){
+  .ceiling-light,.fireplace-glow,
+  .fireplace-embers,.fireplace-smoke,.fireplace-spark,.fireplace-mantel::after,
+  .library-room::after{ animation:none !important; }
+}
+
+/* ── Stats view ────────────────────────────────────────────────────────────── */
+.stats-scroll{padding:18px 20px 24px;overflow-y:auto;height:100%}
+.stats-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.stats-header .setting-select{width:auto;min-width:150px}
+.stats-cards{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+  gap:10px;margin-bottom:20px;
+}
+.stat-card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:12px 14px;display:flex;flex-direction:column;gap:4px;
+}
+.stat-label{font-size:.72rem;color:var(--ink3)}
+.stat-value{font-size:1.3rem;font-weight:700;color:var(--ink)}
+.stats-chart-legend{
+  display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--ink2);margin-bottom:8px;
+}
+.legend-dot{width:9px;height:9px;border-radius:2px;background:var(--accent);display:inline-block}
+.stats-chart-wrap{position:relative;width:100%;height:220px;margin-bottom:8px}
+.stats-table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:8px}
+.stats-table th{
+  text-align:left;padding:8px 6px;color:var(--ink3);font-weight:600;
+  border-bottom:1px solid var(--border);font-size:.72rem;letter-spacing:.02em;
+}
+.stats-table td{padding:8px 6px;border-bottom:1px solid var(--border);color:var(--ink2)}
+.stats-table td:nth-child(4),.stats-table td:nth-child(5),
+.stats-table th:nth-child(4),.stats-table th:nth-child(5){text-align:right}
+.stats-th-actions,.stats-table td:last-child{width:1%;text-align:right}
+.stats-delete-btn{
+  background:none;border:none;padding:4px 6px;font-size:.85rem;
+  opacity:.55;border-radius:4px;line-height:1;
+}
+.stats-delete-btn:hover{opacity:1;background:rgba(224,122,95,.12)}
+.stats-delete-btn:disabled{opacity:.25;cursor:default}
+
+/* ── End-of-session summary ───────────────────────────────────────────────── */
+.session-summary{padding:8px 4px;text-align:left}
+.summary-title{font-size:1.1rem;font-weight:700;margin-bottom:14px;text-align:center}
+.summary-stat-row{
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  background:var(--bg2);border-radius:var(--radius);padding:16px;margin-bottom:16px;
+}
+.summary-stat-value{font-size:2rem;font-weight:700;color:var(--accent)}
+.summary-stat-sub{font-size:.82rem;color:var(--ink2)}
+.summary-subhead{font-size:.78rem;letter-spacing:.02em;color:var(--ink3);margin-bottom:6px;text-transform:uppercase}
+.summary-missed-list{margin:0 0 4px;padding-left:18px;color:var(--ink2);font-size:.9rem}
+.summary-missed-list li{margin-bottom:4px}
+.summary-suggestion{
+  margin:14px 0 16px;padding:10px 12px;background:var(--bg2);border-left:3px solid var(--accent);
+  border-radius:6px;font-size:.88rem;color:var(--ink);
+}

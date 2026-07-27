@@ -1,0 +1,43 @@
+name: CI
+
+# Runs the test suite across OS/Node combinations rather than just one
+# environment. The thing actually worth verifying here isn't "do the tests
+# pass" (they will, identically, everywhere) — it's "does npm install
+# succeed at all," since better-sqlite3 is a native module that has to
+# either fetch a prebuilt binary or compile from source per-platform. A
+# green matrix is evidence the sql.js fallback path (see db/sqlite.js)
+# never even needs to be exercised on a clean install; a red cell tells you
+# exactly which platform to go fix before a real user hits it instead.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node-version: [20.x, 22.x]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run test suite
+        run: npm test

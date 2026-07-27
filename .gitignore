@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+.tutor-secret
+
+# Runtime data — this is real user study data, never commit it
+db/*.db
+db/*.db-shm
+db/*.db-wal
+
+# Local app config — holds the API key when set from Settings instead of .env
+db/config.json
+
+# Hand-rolled pre-git checkpoint system — superseded by real git history
+.checkpoints/
+
+# OS / editor cruft
+.DS_Store
+*.swp
+
+# Claude Code local-only settings (machine-specific permission state) —
+# .claude/launch.json (dev-server config) is fine to share and stays tracked
+.claude/settings.local.json
+
+# Coverage / logs, if either is added later
+coverage/
+*.log
+npm-debug.log*

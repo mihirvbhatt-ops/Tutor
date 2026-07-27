@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>AI Tutor</title>
+  <link rel="manifest" href="/manifest.json"/>
+  <meta name="theme-color" content="#0f1117"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&display=swap"/>
+  <link rel="stylesheet" href="/styles.css"/>
+</head>
+<body>
+<div class="app">
+<main class="main">
+
+  <!-- ── HOME ─────────────────────────────────────────────────────────── -->
+  <section class="view active" id="view-home">
+    <div class="home-header"><span class="version-badge" id="version-badge">v1.100</span></div>
+
+    <div id="landing" class="landing">
+      <div id="no-key-banner" class="no-key-banner hidden">
+        <span class="no-key-banner-text">🔑 No API key set — AI features are off until you add one. Local-only generation still works.</span>
+        <button class="ghost-btn" id="btn-no-key-settings">Add API Key</button>
+      </div>
+      <div id="update-banner" class="no-key-banner hidden">
+        <span class="no-key-banner-text" id="update-banner-text"></span>
+        <a class="ghost-btn" id="update-banner-link" target="_blank" rel="noopener">View Release</a>
+      </div>
+      <div class="landing-hero">
+        <div class="logo-mark">◈</div>
+        <h1 class="landing-title">Ready to learn<br>something new?</h1>
+        <p class="landing-sub">Create a topic and I'll build a personalised study session.</p>
+      </div>
+      <div class="landing-actions">
+        <button id="btn-create-topic" class="cta-btn full">＋ Create New Topic</button>
+        <button id="btn-goto-library" class="ghost-btn wide">📚 Go to Library</button>
+      </div>
+    </div>
+
+    <div id="wizard" class="wizard hidden">
+      <div class="wz-bar">
+        <button class="wz-back" id="wz-back">←</button>
+        <div class="wz-dots" id="wz-dots"></div>
+        <div class="wz-topic-chip" id="wz-topic-chip"></div>
+      </div>
+
+      <!-- Step – Source -->
+      <div class="wz-step active" id="wz-source">
+        <h2 class="wz-title">How do you want to build this topic?</h2>
+        <p class="wz-sub">Upload material to study from, or let AI create everything from scratch.</p>
+        <div class="mode-cards">
+          <div class="mode-card" data-path="upload">
+            <div class="mode-icon">📤</div>
+            <div class="mode-name">Upload Data</div>
+            <div class="mode-desc">Paste notes, add a URL, or upload a PDF / Word / PowerPoint / lecture transcript</div>
+          </div>
+          <div class="mode-card" data-path="ai">
+            <div class="mode-icon">🤖</div>
+            <div class="mode-name">Use AI</div>
+            <div class="mode-desc">Just name a topic — AI builds explanations and questions from its own knowledge</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step – Material (Upload Data path only) -->
+      <div class="wz-step" id="wz-material">
+        <h2 class="wz-title">Add your material</h2>
+        <p class="wz-sub">Paste text, add a URL, or upload a file — lecture transcripts work great here too.</p>
+        <div class="src-tabs">
+          <button class="src-tab active" data-src="paste">Paste</button>
+          <button class="src-tab" data-src="url">URL</button>
+          <button class="src-tab" data-src="file">File</button>
+        </div>
+        <div class="src-panel active" id="src-paste">
+          <textarea id="paste-area" class="wz-textarea" placeholder="Paste lecture notes, textbook passages…" rows="8"></textarea>
+          <span id="paste-count" class="material-count"></span>
+        </div>
+        <div class="src-panel" id="src-url">
+          <input type="url" id="url-input" class="wz-input" placeholder="https://…"/>
+          <p class="hint">The page will be scraped for its content.</p>
+        </div>
+        <div class="src-panel" id="src-file">
+          <label class="file-drop" id="file-drop">
+            <div class="file-icon">📄</div>
+            <span id="file-label">Drop a PDF, Word (.docx), PowerPoint (.pptx) or .txt — or tap to browse</span>
+            <input type="file" id="file-input" accept=".pdf,.txt,.docx,.pptx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"/>
+          </label>
+          <div id="file-review" class="material-review hidden">
+            <p id="file-review-note" class="material-review-note"></p>
+            <textarea id="file-review-text" class="wz-textarea" rows="7"></textarea>
+            <div class="material-review-foot">
+              <span id="file-review-count" class="material-count"></span>
+              <div id="file-review-trim" class="material-trim hidden">
+                <button class="trim-btn" id="btn-trim-start" type="button">Keep first 20,000</button>
+                <button class="trim-btn" id="btn-trim-end" type="button">Keep last 20,000</button>
+                <button class="trim-btn" id="btn-trim-all" type="button">Use full text</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="wz-actions">
+          <button class="primary-btn" id="btn-wz-material-next">Continue →</button>
+        </div>
+      </div>
+
+      <!-- Step – Name -->
+      <div class="wz-step" id="wz-name">
+        <h2 class="wz-title" id="wz-name-title">Name your topic</h2>
+        <p class="wz-sub" id="wz-name-sub"></p>
+        <input type="text" id="wz-name-input" class="wz-input" placeholder=""/>
+        <div class="wz-actions">
+          <button class="primary-btn" id="btn-wz-name-next">Continue →</button>
+        </div>
+      </div>
+
+      <!-- Step – Modes -->
+      <div class="wz-step" id="wz-modes">
+        <h2 class="wz-title">How would you like to study?</h2>
+        <p class="wz-sub">Choose one or more modes. You can switch between them any time.</p>
+        <div class="mode-cards">
+          <div class="mode-card" data-mode="explain">
+            <div class="mode-icon">📖</div>
+            <div class="mode-name">Explanations</div>
+            <div class="mode-desc">Clear, structured breakdown of the topic</div>
+          </div>
+          <div class="mode-card" data-mode="flashcard">
+            <div class="mode-icon">🃏</div>
+            <div class="mode-name">Flashcards</div>
+            <div class="mode-desc">Flip cards to test your memory</div>
+          </div>
+          <div class="mode-card" data-mode="quiz">
+            <div class="mode-icon">✏️</div>
+            <div class="mode-name">Quizzes</div>
+            <div class="mode-desc">Answer questions to check understanding</div>
+          </div>
+        </div>
+        <div class="wz-actions">
+          <button class="primary-btn" id="btn-wz-modes-next">Continue</button>
+        </div>
+      </div>
+
+      <!-- Step – Setup -->
+      <div class="wz-step" id="wz-setup">
+        <h2 class="wz-title">Customise your session</h2>
+
+        <div class="setup-group">
+          <div class="setup-label-row">
+            <label class="setup-label">Expertise level</label>
+            <button class="skip-link" id="btn-skip-level">Skip</button>
+          </div>
+          <div class="pill-row" id="pills-level">
+            <button class="pill" data-val="beginner">Beginner</button>
+            <button class="pill active" data-val="intermediate">Intermediate</button>
+            <button class="pill" data-val="advanced">Advanced</button>
+          </div>
+          <p class="skipped-note hidden" id="level-skipped">Skipped — no level set</p>
+        </div>
+
+        <div class="setup-group">
+          <div class="setup-label-row">
+            <label class="setup-label">Time you can dedicate</label>
+            <button class="skip-link" id="btn-skip-time">Skip</button>
+          </div>
+          <div class="time-input-wrap" id="time-input-wrap">
+            <input type="number" id="time-hours" class="time-input-part"
+              inputmode="numeric" pattern="[0-9]*" min="0" max="23" placeholder="0"/>
+            <span class="time-colon">:</span>
+            <input type="number" id="time-minutes" class="time-input-part"
+              inputmode="numeric" pattern="[0-9]*" min="0" max="59" placeholder="00"/>
+            <span class="time-label">hr : min</span>
+          </div>
+          <p class="skipped-note hidden" id="time-skipped">Skipped — no time limit set</p>
+        </div>
+
+        <div class="setup-group hidden" id="setup-gen-source">
+          <div class="setup-label-row">
+            <label class="setup-label">Question generation</label>
+          </div>
+          <div class="pill-row" id="pills-gen-source" role="group" aria-label="Question generation source">
+            <button class="pill" data-val="ai" aria-pressed="false">🤖 With AI</button>
+            <button class="pill active" data-val="hybrid" aria-pressed="true">✨ Both</button>
+            <button class="pill" data-val="local" aria-pressed="false">📖 Without AI</button>
+          </div>
+          <div class="count-picker" role="group" aria-label="Number of questions per source">
+            <label class="count-field">
+              <span class="count-field-label">🤖 AI count</span>
+              <input type="number" class="count-input" id="wz-count-ai" min="1" max="25" value="10" inputmode="numeric"/>
+            </label>
+            <label class="count-field">
+              <span class="count-field-label">📖 Local count</span>
+              <input type="number" class="count-input" id="wz-count-local" min="1" max="25" value="10" inputmode="numeric"/>
+            </label>
+          </div>
+          <p class="hint" style="margin-top:6px">Applies to flashcards and quiz questions.</p>
+        </div>
+
+        <div class="wz-actions" style="margin-top:32px">
+          <button class="cta-btn full" id="btn-begin">Begin Studying →</button>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div class="wz-step" id="wz-loading">
+        <div class="loading-wrap">
+          <div class="spinner"></div>
+          <p class="loading-msg" id="loading-msg">Setting up your session…</p>
+          <div class="loading-checks" id="loading-checks"></div>
+          <button class="ghost-btn" id="btn-cancel-session" style="margin-top:24px">✕ Cancel</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── STUDY ─────────────────────────────────────────────────────────── -->
+  <section class="view" id="view-study">
+    <div id="study-tabs-bar" class="study-tabs-bar hidden"></div>
+    <div id="study-empty" class="study-empty">
+      <div class="empty-glyph">📖</div>
+      <p class="empty-title">No active topic</p>
+      <p class="hint">Start a session from Home, open a topic from the Library, or tap + above for a blank tab.</p>
+    </div>
+    <div id="study-active" class="study-active hidden">
+      <div class="study-header">
+        <div class="study-header-row">
+          <div>
+            <h2 class="study-topic-name" id="study-topic-name"></h2>
+            <p class="study-meta" id="study-meta"></p>
+          </div>
+          <button class="ghost-btn manage-toggle-btn" id="btn-manage-topic" aria-expanded="false" aria-controls="topic-manage-panel">✎ Manage</button>
+        </div>
+      </div>
+
+      <!-- Manage panel: edit topic details + manual question creation/editing -->
+      <div id="topic-manage-panel" class="topic-manage-panel hidden" role="region" aria-labelledby="manage-panel-title">
+        <div class="manage-panel-header">
+          <h3 id="manage-panel-title" class="manage-panel-title">Manage Topic</h3>
+          <button class="panel-exit-btn" id="btn-manage-close" aria-label="Close manage panel" title="Close">✕</button>
+        </div>
+
+        <div class="manage-section">
+          <h4 class="manage-h4">Topic Details</h4>
+          <input type="text" id="mt-name" class="wz-input" placeholder="Topic name"/>
+          <textarea id="mt-content" class="wz-textarea" rows="6" placeholder="Reference material / notes" style="margin-top:8px"></textarea>
+          <div class="manage-actions">
+            <button class="ghost-btn" id="mt-cancel-details">Cancel</button>
+            <button class="primary-btn" id="mt-save-details" style="margin-top:0">Save Details</button>
+          </div>
+          <p id="mt-details-status" class="status-line" aria-live="polite"></p>
+        </div>
+
+        <div class="manage-section">
+          <h4 class="manage-h4">Questions &amp; Flashcards</h4>
+          <div id="mt-questions-list" class="mt-questions-list"></div>
+          <button class="ghost-btn wide" id="mt-add-question-toggle">+ Add Question</button>
+
+          <div id="mt-add-question-form" class="mt-question-form hidden">
+            <select id="mt-q-type" class="wz-input">
+              <option value="short">Short answer</option>
+              <option value="mcq">Multiple choice</option>
+              <option value="flashcard">Flashcard</option>
+            </select>
+            <textarea id="mt-q-question" class="wz-textarea" rows="2" placeholder="Question" style="margin-top:8px"></textarea>
+            <textarea id="mt-q-answer" class="wz-textarea" rows="2" placeholder="Answer" style="margin-top:8px"></textarea>
+            <input type="text" id="mt-q-options" class="wz-input" style="margin-top:8px"
+              placeholder="MCQ options, comma-separated (include the correct answer)"/>
+            <div class="manage-actions">
+              <button class="ghost-btn" id="mt-q-cancel">Cancel</button>
+              <button class="primary-btn" id="mt-q-save" style="margin-top:0">Save Question</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="manage-section">
+          <h4 class="manage-h4">Generate Questions</h4>
+          <div class="pill-row" id="regen-mode-toggle" role="group" aria-label="Replace or add to existing questions">
+            <button class="pill active" data-val="replace" aria-pressed="true">🔁 Replace existing</button>
+            <button class="pill" data-val="append" aria-pressed="false">➕ Add more</button>
+          </div>
+          <p class="hint" id="regen-hint">Replaces all existing flashcards or quiz questions for this topic — including any added manually.</p>
+          <div class="count-picker" role="group" aria-label="Number of questions per source">
+            <label class="count-field">
+              <span class="count-field-label">🤖 AI count</span>
+              <input type="number" class="count-input" id="regen-count-ai" min="1" max="25" value="10" inputmode="numeric"/>
+            </label>
+            <label class="count-field">
+              <span class="count-field-label">📖 Local count</span>
+              <input type="number" class="count-input" id="regen-count-local" min="1" max="25" value="10" inputmode="numeric"/>
+            </label>
+          </div>
+          <div class="regen-row">
+            <span class="regen-label">🗂️ Flashcards</span>
+            <div class="regen-buttons" id="regen-flashcard"></div>
+          </div>
+          <div class="regen-row">
+            <span class="regen-label">❓ Quiz</span>
+            <div class="regen-buttons" id="regen-quiz"></div>
+          </div>
+          <p id="regen-status" class="status-line" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <div class="study-mode-bar">
+        <button class="mode-tab active" data-mode="explain">Explain</button>
+        <button class="mode-tab" data-mode="flashcard">Flashcards</button>
+        <button class="mode-tab" data-mode="quiz">Quiz</button>
+      </div>
+      <div class="study-panels">
+
+        <!-- Explain -->
+        <div class="study-panel active" id="panel-explain">
+          <div id="explain-empty-state" class="empty-tab-prompt hidden"></div>
+          <div id="explain-body" class="explain-body"></div>
+          <div id="explain-followups"></div>
+          <div class="explain-followup-bar" id="explain-followup-bar">
+            <div class="followup-chips">
+              <button class="chip-btn" data-q="Explain that again more simply, as if I'm new to this topic.">Simplify</button>
+              <button class="chip-btn" data-q="Give me a concrete real-world example.">Example</button>
+              <button class="chip-btn" data-q="Explain this from a different angle or with a different analogy.">Different angle</button>
+            </div>
+            <div class="followup-input-row">
+              <input type="text" id="followup-input" placeholder="Ask a follow-up…" maxlength="500"/>
+              <button id="btn-followup-send" class="primary-btn">Ask</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flashcards -->
+        <div class="study-panel" id="panel-flashcard">
+          <div class="flash-top">
+            <span id="flash-counter" class="counter-label"></span>
+            <div class="prog-track"><div id="flash-fill" class="prog-fill"></div></div>
+            <button class="panel-exit-btn" id="btn-flash-exit" aria-label="Exit flashcards" title="Exit flashcards">✕</button>
+          </div>
+          <div class="card-scene" id="flash-card-scene">
+            <div class="flashcard" id="flashcard">
+              <div class="card-face front">
+                <span class="face-label">Question</span>
+                <p id="flash-front" class="face-text"></p>
+                <button class="reveal-btn" id="btn-reveal">Tap to reveal →</button>
+              </div>
+              <div class="card-face back">
+                <span class="face-label">Answer</span>
+                <p id="flash-back" class="face-text"></p>
+                <div class="verdict-row">
+                  <button class="vbtn wrong" id="btn-flash-wrong">✗ Missed it</button>
+                  <button class="vbtn right" id="btn-flash-right">✓ Got it</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="flash-gen-empty" class="empty-tab-prompt hidden"></div>
+          <div id="flash-summary-wrap" class="hidden"></div>
+        </div>
+
+        <!-- Quiz -->
+        <div class="study-panel" id="panel-quiz">
+          <div class="quiz-top">
+            <span id="quiz-counter" class="counter-label"></span>
+            <div class="prog-track"><div id="quiz-fill" class="prog-fill"></div></div>
+            <span id="quiz-clock" class="quiz-clock" title="Time elapsed">00:00</span>
+            <button class="panel-exit-btn" id="btn-quiz-pause" title="Pause">⏸</button>
+            <button class="panel-exit-btn" id="btn-quiz-exit" aria-label="Exit quiz" title="Exit quiz">✕</button>
+          </div>
+          <div class="quiz-card" id="quiz-card">
+            <span class="q-badge" id="q-badge"></span>
+            <p id="q-text" class="q-text"></p>
+            <div id="q-options" class="q-options"></div>
+            <button class="primary-btn hidden" id="btn-confirm-mcq" disabled>Confirm Answer</button>
+            <div id="q-open" class="q-open hidden">
+              <textarea id="q-answer" class="wz-textarea" placeholder="Type your answer…" rows="4"></textarea>
+              <button class="primary-btn" id="btn-submit-answer">Submit Answer</button>
+            </div>
+            <div id="q-feedback" class="q-feedback hidden">
+              <p id="q-verdict" class="q-verdict"></p>
+              <p id="q-explanation" class="q-expl"></p>
+              <button class="primary-btn" id="btn-next-q">Next →</button>
+            </div>
+          </div>
+          <div id="quiz-gen-empty" class="empty-tab-prompt hidden"></div>
+          <div id="quiz-summary-wrap" class="hidden"></div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── LIBRARY ───────────────────────────────────────────────────────── -->
+  <section class="view" id="view-library">
+    <!-- Single search bar for topics -->
+    <div class="lib-header">
+      <div class="search-wrap">
+        <span class="search-ico">🔍</span>
+        <input type="text" id="library-search" class="lib-search" placeholder="Search topics…"/>
+      </div>
+    </div>
+
+    <!-- Room: courses wall of bookcases, fireplace under its chimney, topics wall of bookcases — all on one floor.
+         The bookcase sections now hold only the shelving itself (crown/case/plinth), so each section
+         stretches the full height of the room exactly like the fireplace's chimney — no header eating
+         into that height and throwing the tops/bottoms out of alignment. The plaques, +New button, and
+         course panels live in the floor row below instead, lined up under the shelf they belong to. -->
+    <div class="library-scroll">
+      <div class="library-room">
+
+        <!-- ── Courses wall ── -->
+        <div class="bookcase-section" id="courses-section">
+          <div class="bookcase-frame">
+            <div class="bookcase-crown"></div>
+            <div class="bookcase bookcase-courses" id="bookcase-courses">
+              <div class="ceiling-light"></div>
+              <div id="courses-shelves-wrap" class="shelves-wrap"></div>
+              <div id="courses-empty" class="lib-empty hidden">
+                <p>No courses yet — tap <strong>+ New</strong> to create one.</p>
+              </div>
+            </div>
+            <div class="bookcase-plinth"></div>
+          </div>
+        </div>
+
+        <div class="library-wall" aria-hidden="true"></div>
+
+        <!-- ── Fireplace divider, standing between the two walls of bookcases ── -->
+        <div class="library-fireplace" aria-hidden="true">
+          <div class="fireplace-chimney">
+            <div class="fireplace-bricks"></div>
+          </div>
+          <div class="fireplace-mantel">
+            <span class="mantel-plaque">✦</span>
+          </div>
+          <div class="fireplace-surround">
+            <div class="fireplace-firebox">
+              <div class="fireplace-glow"></div>
+              <div class="fireplace-embers"></div>
+              <div class="fireplace-log log-a"></div>
+              <div class="fireplace-log log-b"></div>
+              <div class="fireplace-smoke s1"></div>
+              <div class="fireplace-smoke s2"></div>
+              <div class="fireplace-flame flame-secondary" aria-hidden="true">
+                <div class="flame-lick lick-a"></div>
+                <div class="flame-lick lick-c"></div>
+                <div class="flame-lick lick-b"></div>
+                <div class="flame-core"></div>
+              </div>
+              <div class="fireplace-flame" aria-hidden="true">
+                <div class="flame-lick lick-a"></div>
+                <div class="flame-lick lick-c"></div>
+                <div class="flame-lick lick-b"></div>
+                <div class="flame-core"></div>
+              </div>
+              <div class="fireplace-log log-c"></div>
+              <div class="fireplace-spark sp1"></div>
+              <div class="fireplace-spark sp2"></div>
+              <div class="fireplace-spark sp3"></div>
+            </div>
+          </div>
+          <div class="fireplace-hearth"></div>
+        </div>
+
+        <div class="library-wall" aria-hidden="true"></div>
+
+        <!-- ── Topics wall ── -->
+        <div class="bookcase-section" id="topics-section">
+          <div class="bookcase-frame">
+            <div class="bookcase-crown"></div>
+            <div class="bookcase" id="bookcase">
+              <div class="ceiling-light"></div>
+              <div id="shelves-wrap" class="shelves-wrap"></div>
+              <div id="library-empty" class="lib-empty hidden">
+                <p>Your library is empty.</p>
+                <p class="hint">Study a topic and it will appear here as a book.</p>
+              </div>
+            </div>
+            <div class="bookcase-plinth"></div>
+          </div>
+        </div>
+
+      </div><!-- /library-room -->
+
+      <!-- Floor: the same wood strip the whole room stands on, now also carrying the
+           Courses/Topics plaques and controls, lined up directly under their bookcase. -->
+      <div class="library-floor">
+        <div class="floor-plank"></div>
+        <div class="library-floor-row">
+          <div class="floor-slot floor-slot-shelf">
+            <div class="bookcase-section-header">
+              <span class="bookcase-section-title"><span class="plaque">Courses</span></span>
+              <button id="btn-new-course" class="bookcase-new-btn">+ New</button>
+            </div>
+            <!-- New course inline form -->
+            <div id="new-course-form" class="new-course-form hidden">
+              <input type="text" id="nc-name" class="wz-input" placeholder="Course name, e.g. Biology 101"/>
+              <textarea id="nc-desc" class="wz-textarea" placeholder="Brief description (optional)" rows="2" style="margin-top:8px"></textarea>
+              <div style="display:flex;gap:8px;margin-top:10px">
+                <button class="ghost-btn" id="btn-nc-cancel">Cancel</button>
+                <button class="primary-btn" id="btn-nc-create" style="margin-top:0">Create Course</button>
+              </div>
+            </div>
+            <!-- Inline course detail panel (slides open when a course book is clicked) -->
+            <div id="course-detail-panel" class="course-detail-panel hidden"></div>
+          </div>
+          <div class="floor-slot floor-slot-wall" aria-hidden="true"></div>
+          <div class="floor-slot floor-slot-fireplace" aria-hidden="true"></div>
+          <div class="floor-slot floor-slot-wall" aria-hidden="true"></div>
+          <div class="floor-slot floor-slot-shelf">
+            <div class="bookcase-section-header">
+              <span class="bookcase-section-title"><span class="plaque">Topics</span></span>
+              <select id="lib-sort" class="lib-sort-select" aria-label="Sort topics">
+                <option value="recent">🕒 Recently Used</option>
+                <option value="alpha">🔤 A–Z</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /library-scroll -->
+  </section>
+
+  <!-- ── STATS ────────────────────────────────────────────────────────── -->
+  <section class="view" id="view-stats">
+    <div class="stats-scroll">
+      <div class="stats-header">
+        <h2 class="settings-title">Stats</h2>
+        <select id="stats-topic-filter" class="setting-select"><option value="">All topics</option></select>
+      </div>
+
+      <div class="stats-cards">
+        <div class="stat-card"><span class="stat-label">Overall accuracy</span><span class="stat-value" id="stat-accuracy">–</span></div>
+        <div class="stat-card"><span class="stat-label">Current streak</span><span class="stat-value" id="stat-streak">–</span></div>
+        <div class="stat-card"><span class="stat-label">Sessions this week</span><span class="stat-value" id="stat-week">–</span></div>
+        <div class="stat-card"><span class="stat-label">Time studied</span><span class="stat-value" id="stat-time">–</span></div>
+      </div>
+
+      <div class="stats-chart-legend">
+        <span class="legend-dot"></span>Session accuracy
+      </div>
+      <div class="stats-chart-wrap">
+        <canvas id="stats-chart" role="img" aria-label="Line chart of quiz and flashcard accuracy by session number"></canvas>
+      </div>
+      <p id="stats-empty" class="hint hidden">No completed sessions yet — finish a quiz or flashcard deck to see your progress here.</p>
+
+      <p class="section-label" style="margin-top:24px">Recent sessions</p>
+      <table class="stats-table">
+        <thead>
+          <tr><th>Date</th><th>Topic</th><th>Mode</th><th>Accuracy</th><th>Avg time/Q</th><th class="stats-th-actions"></th></tr>
+        </thead>
+        <tbody id="stats-session-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── SETTINGS ─────────────────────────────────────────────────────── -->
+  <section class="view" id="view-settings">
+    <div class="settings-scroll">
+      <h2 class="settings-title">Settings</h2>
+
+      <div class="settings-section">
+        <h3 class="section-label">AI Provider</h3>
+        <div class="setting-row">
+          <span class="setting-key">Provider</span>
+          <select id="s-provider" class="setting-select">
+            <option value="anthropic">Anthropic (Claude)</option>
+          </select>
+        </div>
+        <div class="setting-row col">
+          <span class="setting-key">API key</span>
+          <div class="apikey-row">
+            <input type="password" id="s-apikey-input" class="wz-input" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"/>
+            <button class="primary-btn" id="btn-apikey-save">Save</button>
+          </div>
+          <p class="hint" id="apikey-status" aria-live="polite"></p>
+          <div class="apikey-links">
+            <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Get an API key →</a>
+            <button class="ghost-btn hidden" id="btn-apikey-clear">Clear key</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3 class="section-label">Typography</h3>
+        <div class="setting-row">
+          <span class="setting-key">Font family</span>
+          <select id="s-font" class="setting-select">
+            <option value="system">System</option>
+            <option value="serif">Serif (Georgia)</option>
+            <option value="mono">Monospace</option>
+            <option value="humanist">Humanist</option>
+            <!-- custom fonts injected here by app.js -->
+          </select>
+        </div>
+        <div class="setting-row">
+          <span class="setting-key" style="color:var(--ink3);font-size:.78rem">
+            Drop .woff2/.ttf/.otf files into <code style="font-size:.78rem;background:var(--bg3);padding:2px 5px;border-radius:4px">public/fonts/</code> to add fonts
+          </span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-key">Text size</span>
+          <div class="size-row">
+            <span class="size-a small">A</span>
+            <input type="range" id="s-size" min="12" max="24" step="1" value="16" class="size-range"/>
+            <span class="size-a large">A</span>
+            <span class="size-val" id="size-val">16px</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3 class="section-label">Appearance</h3>
+        <div class="setting-row">
+          <span class="setting-key">Dark mode</span>
+          <label class="toggle">
+            <input type="checkbox" id="s-dark" checked/>
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+        <div class="setting-row col">
+          <span class="setting-key">Accent colour</span>
+          <div class="swatches" id="swatches-accent">
+            <button class="swatch active" data-c="#6c63ff" style="--sc:#6c63ff"></button>
+            <button class="swatch" data-c="#e84393" style="--sc:#e84393"></button>
+            <button class="swatch" data-c="#f59e0b" style="--sc:#f59e0b"></button>
+            <button class="swatch" data-c="#10b981" style="--sc:#10b981"></button>
+            <button class="swatch" data-c="#ef4444" style="--sc:#ef4444"></button>
+            <button class="swatch" data-c="#3b82f6" style="--sc:#3b82f6"></button>
+            <label class="swatch custom" title="Custom colour">
+              +<input type="color" id="s-accent-custom" value="#6c63ff"/>
+            </label>
+          </div>
+        </div>
+        <div class="setting-row col">
+          <span class="setting-key">Background</span>
+          <div class="swatches" id="swatches-bg-dark">
+            <button class="swatch active" data-c="#0f1117" style="--sc:#0f1117;outline-color:#666"></button>
+            <button class="swatch" data-c="#0d1b2a" style="--sc:#0d1b2a"></button>
+            <button class="swatch" data-c="#1c0f0f" style="--sc:#1c0f0f"></button>
+            <button class="swatch" data-c="#0f1c0f" style="--sc:#0f1c0f"></button>
+            <button class="swatch" data-c="#1c1c0f" style="--sc:#1c1c0f"></button>
+            <label class="swatch custom" title="Custom colour">
+              +<input type="color" id="s-bg-custom-dark" value="#0f1117"/>
+            </label>
+          </div>
+          <div class="swatches hidden" id="swatches-bg-light">
+            <button class="swatch active" data-c="#f4f1eb" style="--sc:#f4f1eb;outline-color:#999"></button>
+            <button class="swatch" data-c="#eaf1f7" style="--sc:#eaf1f7"></button>
+            <button class="swatch" data-c="#f7ecec" style="--sc:#f7ecec"></button>
+            <button class="swatch" data-c="#eef4ea" style="--sc:#eef4ea"></button>
+            <button class="swatch" data-c="#f6f2e4" style="--sc:#f6f2e4"></button>
+            <label class="swatch custom" title="Custom colour">
+              +<input type="color" id="s-bg-custom-light" value="#f4f1eb"/>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <button class="ghost-btn wide" id="btn-reset-settings">Reset to defaults</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="bottom-nav">
+  <button class="nav-btn active" data-view="home">
+    <span class="nav-ico">🏠</span><span class="nav-lbl">Home</span>
+  </button>
+  <button class="nav-btn" data-view="study">
+    <span class="nav-ico">📖</span><span class="nav-lbl">Study</span>
+  </button>
+  <button class="nav-btn" data-view="library">
+    <span class="nav-ico">📚</span><span class="nav-lbl">Library</span>
+  </button>
+  <button class="nav-btn" data-view="stats">
+    <span class="nav-ico">📊</span><span class="nav-lbl">Stats</span>
+  </button>
+  <button class="nav-btn" data-view="settings">
+    <span class="nav-ico">⚙️</span><span class="nav-lbl">Settings</span>
+  </button>
+</nav>
+
+<!-- Mode picker: shown when a topic book is clicked (library shelf or a
+     course's topic list) — placed outside every .view so its fixed
+     positioning centers on the real viewport, not clipped by whichever
+     shelf/edge the book was clicked near. -->
+<div id="topic-mode-picker" class="mode-picker-overlay hidden">
+  <div class="mode-picker-card" id="mode-picker-card">
+    <div class="mode-picker-title" id="mode-picker-title"></div>
+    <button class="mode-picker-option" data-mode="explain">
+      <span class="mp-ico">📖</span><span>Explain</span>
+    </button>
+    <button class="mode-picker-option" data-mode="flashcard">
+      <span class="mp-ico">🗂️</span><span>Flashcards</span>
+    </button>
+    <button class="mode-picker-option" data-mode="quiz">
+      <span class="mp-ico">❓</span><span>Quiz</span>
+    </button>
+    <button class="mode-picker-option" data-mode="stats">
+      <span class="mp-ico">📊</span><span>Stats</span>
+    </button>
+    <button class="mode-picker-cancel" id="mode-picker-cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- Topic stats popup: explanation-read % + overall/per-type question accuracy.
+     Opened via the "Stats" option above. Content is built entirely in JS
+     (see showTopicStats() in app.js) since the number of question-type rows
+     varies per topic. -->
+<div id="topic-stats-overlay" class="mode-picker-overlay hidden">
+  <div class="mode-picker-card stats-popup-card" id="topic-stats-card"></div>
+</div>
+
+<!-- Course stats popup: aggregate course score + one progress bar per topic.
+     Opened via the "Stats" button in the course detail panel. -->
+<div id="course-stats-overlay" class="mode-picker-overlay hidden">
+  <div class="mode-picker-card stats-popup-card" id="course-stats-card"></div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/lib/marked.umd.min.js"></script>
+<!--
+  Classic (non-module) scripts, loaded in dependency order. Deliberately NOT
+  type="module": top-level `let`/`const`/`function` bindings in one classic
+  <script> are visible to every later classic <script> in the same document
+  (they share one global lexical environment — see the HTML spec's "list of
+  scripts" processing model), so this split is a pure file-boundary change,
+  not a scoping change. core.js must load first (state + DOM helpers +
+  showView + tab management everything else depends on); init.js must load
+  last (it calls functions defined in several of the others).
+-->
+<script src="/js/core.js"></script>
+<script src="/js/wizard.js"></script>
+<script src="/js/study.js"></script>
+<script src="/js/library.js"></script>
+<script src="/js/stats.js"></script>
+<script src="/js/settings-ui.js"></script>
+<script src="/js/courses.js"></script>
+<script src="/js/init.js"></script>
+</body>
+</html>

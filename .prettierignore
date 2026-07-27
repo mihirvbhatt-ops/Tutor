@@ -1,0 +1,5 @@
+node_modules
+db/*.db
+db/*.db-*
+public/fonts
+package-lock.json
