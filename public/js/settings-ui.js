@@ -1,6 +1,7 @@
 // ── SETTINGS UI ───────────────────────────────────────────────────────────────
 function syncSettingsUI() {
   loadApiKeyStatus();
+  loadSearchKeyStatus();
   get('s-font').value    = settings.fontFamily;
   get('s-size').value    = settings.fontSize;
   get('size-val').textContent = settings.fontSize + 'px';
@@ -136,6 +137,87 @@ get('btn-apikey-clear').addEventListener('click', async () => {
 get('btn-no-key-settings').addEventListener('click', () => {
   showView('settings');
   get('s-apikey-input').focus({ preventScroll: true });
+});
+
+// ── Search provider / API key (roadmap #1) ──────────────────────────────────
+// Optional, mirrors the AI key handling above — only needed for the
+// wizard's "Search" material source.
+const SEARCH_KEY_LINKS = {
+  tavily: { href: 'https://tavily.com', label: 'Get a Tavily key →' },
+  brave:  { href: 'https://brave.com/search/api/', label: 'Get a Brave Search key →' },
+  serper: { href: 'https://serper.dev', label: 'Get a Serper key →' }
+};
+
+function syncSearchKeyLink(provider) {
+  const link = SEARCH_KEY_LINKS[provider] || SEARCH_KEY_LINKS.tavily;
+  const el = get('search-key-get-link');
+  el.href = link.href;
+  el.textContent = link.label;
+}
+
+async function loadSearchKeyStatus() {
+  let status;
+  try { status = await getJson('/api/settings/search-key'); }
+  catch { status = { hasKey: false, source: null, provider: 'tavily', keyPreview: null }; }
+  get('s-search-provider').value = status.provider;
+  syncSearchKeyLink(status.provider);
+  renderSearchKeyStatus(status);
+  return status;
+}
+
+function renderSearchKeyStatus(status) {
+  const statusEl = get('search-key-status');
+  const clearBtn = get('btn-search-key-clear');
+  statusEl.classList.remove('ok', 'err');
+  if (status.hasKey) {
+    statusEl.classList.add('ok');
+    statusEl.textContent = status.source === 'env'
+      ? `✓ Using the environment variable (ending ${status.keyPreview})`
+      : `✓ Key saved (ending ${status.keyPreview})`;
+    clearBtn.classList.toggle('hidden', status.source !== 'file');
+  } else {
+    statusEl.textContent = 'No key set — the "Search" material source is unavailable until you add one.';
+    clearBtn.classList.add('hidden');
+  }
+}
+
+get('s-search-provider').addEventListener('change', e => syncSearchKeyLink(e.target.value));
+
+get('btn-search-key-save').addEventListener('click', async () => {
+  const input = get('s-search-key-input');
+  const statusEl = get('search-key-status');
+  const key = input.value.trim();
+  if (!key) {
+    statusEl.classList.remove('ok');
+    statusEl.classList.add('err');
+    statusEl.textContent = 'Enter a key first.';
+    return;
+  }
+
+  const btn = get('btn-search-key-save');
+  btn.disabled = true;
+  statusEl.classList.remove('ok', 'err');
+  statusEl.textContent = 'Validating…';
+
+  try {
+    const data = await post('/api/settings/search-key', { apiKey: key, provider: get('s-search-provider').value });
+    input.value = '';
+    await loadSearchKeyStatus();
+    statusEl.classList.add('ok');
+    statusEl.textContent = data.shadowedByEnv
+      ? '✓ Saved — but an environment variable for this provider is set and takes precedence over this.'
+      : `✓ Key saved (ending ${data.keyPreview})`;
+  } catch (err) {
+    statusEl.classList.add('err');
+    statusEl.textContent = err.message || 'Could not save the key.';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+get('btn-search-key-clear').addEventListener('click', async () => {
+  await del('/api/settings/search-key');
+  await loadSearchKeyStatus();
 });
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────

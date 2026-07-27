@@ -52,6 +52,20 @@ class NoApiKeyError extends Error {
     this.status = 400;
   }
 }
+
+// roadmap #9 — several catch-all handlers used to return err.message
+// straight to the client, which can leak internals (file paths, SQL
+// fragments, stack-trace text) to whatever's on the other end of the
+// request — harmless today since that's always the same person's own
+// browser, but not once this is anything but strictly single-user.
+// NoApiKeyError's message is the one deliberate exception: it's written
+// for the Settings UI to show, not an accident. Everything else gets a
+// generic message here; the real error is still logged server-side by
+// each catch block for debugging.
+function clientSafeMessage(err, fallback = 'Something went wrong — please try again.') {
+  return err?.code === 'NO_API_KEY' ? err.message : fallback;
+}
+
 function requireApiKey() {
   const apiKey = getApiKey();
   if (!apiKey) throw new NoApiKeyError();
@@ -288,7 +302,7 @@ app.post('/api/chat', async (req, res) => {
   } catch (err) {
     if (!controller.signal.aborted) {
       if (err.code !== 'NO_API_KEY') console.error(err);
-      send('error', { error: err.message, code: err.code });
+      send('error', { error: clientSafeMessage(err), code: err.code });
     }
   } finally {
     res.end();
@@ -363,7 +377,7 @@ app.post('/api/evaluate', async (req, res) => {
     res.json(result);
   } catch (err) {
     if (err.code !== 'NO_API_KEY') console.error(err);
-    res.status(err.status || 500).json({ error: err.message, code: err.code });
+    res.status(err.status || 500).json({ error: clientSafeMessage(err), code: err.code });
   }
 });
 
@@ -502,7 +516,7 @@ app.post('/api/topics/:id/generate-questions', async (req, res) => {
       if (err.code !== 'NO_API_KEY') console.warn(`[generate-questions] AI generation failed: ${err.message}`);
       if (source === 'ai') {
         return res.status(err.status || 500).json({
-          error: err.code === 'NO_API_KEY' ? err.message : 'AI question generation failed — check the API key and try again.',
+          error: clientSafeMessage(err, 'AI question generation failed — check the API key and try again.'),
           code: err.code
         });
       }
@@ -605,7 +619,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     res.json({ filename: originalname, content, length: content.length, fullLength: text.length, hardCapped });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: clientSafeMessage(err) });
   }
 });
 
@@ -669,7 +683,7 @@ app.post('/api/topics', async (req, res) => {
     res.status(201).json(saveTopic({ name, content, source, sourceRef }));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: clientSafeMessage(err) });
   }
 });
 
@@ -888,8 +902,7 @@ app.post('/api/settings/search-key', async (req, res) => {
   }
 
   saveSearchConfig(trimmed, provider);
-  const envVar = { tavily: 'TAVILY_API_KEY', brave: 'BRAVE_API_KEY', serper: 'SERPER_API_KEY' }[provider];
-  res.status(201).json({ ok: true, keyPreview: keyPreview(trimmed), shadowedByEnv: !!process.env[envVar] });
+  res.status(201).json({ ok: true, keyPreview: keyPreview(trimmed), shadowedByEnv: getSearchApiKeySource() === 'env' });
 });
 
 app.delete('/api/settings/search-key', (req, res) => {
@@ -909,7 +922,7 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 app.use((err, req, res, next) => {
   console.error(err);
   if (res.headersSent) return next(err);
-  res.status(err?.status || 500).json({ error: err?.message || 'Internal server error', code: err?.code });
+  res.status(err?.status || 500).json({ error: clientSafeMessage(err, 'Internal server error'), code: err?.code });
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
@@ -922,4 +935,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   app.listen(PORT, () => console.log(`AI Tutor running at http://localhost:${PORT}`));
 }
 
-export { app, initDb, markCacheBreakpoint, CACHED_TOOLS };
+export { app, initDb, markCacheBreakpoint, CACHED_TOOLS, clientSafeMessage };

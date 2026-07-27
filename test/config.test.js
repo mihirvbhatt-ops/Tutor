@@ -63,3 +63,54 @@ test('clearApiKey removes the key but leaves the rest of the config (provider) i
   assert.equal(cfg.getApiKey(), null);
   assert.equal(cfg.getProvider(), 'anthropic');
 });
+
+// ── Search provider / API key (roadmap #1) ──────────────────────────────────
+const ORIGINAL_ENV = { TAVILY_API_KEY: process.env.TAVILY_API_KEY, BRAVE_API_KEY: process.env.BRAVE_API_KEY };
+delete process.env.TAVILY_API_KEY;
+delete process.env.BRAVE_API_KEY;
+after(() => {
+  for (const [key, val] of Object.entries(ORIGINAL_ENV)) {
+    if (val === undefined) delete process.env[key]; else process.env[key] = val;
+  }
+});
+
+test('getSearchProvider defaults to "tavily" when nothing is configured', () => {
+  assert.equal(cfg.getSearchProvider(), 'tavily');
+});
+
+test('getSearchApiKey/getSearchApiKeySource return null when neither env nor file is set', () => {
+  assert.equal(cfg.getSearchApiKey(), null);
+  assert.equal(cfg.getSearchApiKeySource(), null);
+});
+
+test('saveSearchConfig persists provider + key, and getSearchApiKey/getSearchApiKeySource pick it up', () => {
+  cfg.saveSearchConfig('tvly-file-key', 'brave');
+  assert.equal(cfg.getSearchProvider(), 'brave');
+  assert.equal(cfg.getSearchApiKey(), 'tvly-file-key');
+  assert.equal(cfg.getSearchApiKeySource(), 'file');
+});
+
+test('the matching provider env var takes precedence over a saved file key', () => {
+  cfg.saveSearchConfig('tvly-file-key', 'tavily');
+  process.env.TAVILY_API_KEY = 'tvly-env-key';
+  assert.equal(cfg.getSearchApiKey(), 'tvly-env-key');
+  assert.equal(cfg.getSearchApiKeySource(), 'env');
+  delete process.env.TAVILY_API_KEY;
+});
+
+test('an env var for a different provider than the one configured is ignored', () => {
+  cfg.saveSearchConfig('tvly-file-key', 'tavily');
+  process.env.BRAVE_API_KEY = 'brave-env-key'; // configured provider is tavily, not brave
+  assert.equal(cfg.getSearchApiKey(), 'tvly-file-key');
+  assert.equal(cfg.getSearchApiKeySource(), 'file');
+  delete process.env.BRAVE_API_KEY;
+});
+
+test('clearSearchConfig removes the key but leaves the provider and the Anthropic key intact', () => {
+  cfg.saveApiKey('sk-ant-file-key', 'anthropic');
+  cfg.saveSearchConfig('tvly-file-key', 'serper');
+  cfg.clearSearchConfig();
+  assert.equal(cfg.getSearchApiKey(), null);
+  assert.equal(cfg.getSearchProvider(), 'serper');
+  assert.equal(cfg.getApiKey(), 'sk-ant-file-key');
+});

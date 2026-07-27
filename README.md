@@ -12,9 +12,13 @@ own Anthropic API key.
 - **Three study modes per topic** — structured Explanations (streamed,
   markdown-rendered), 3D-flip Flashcards, and multiple-choice Quizzes with a
   pausable on-screen timer
-- **Bring your own material** — paste text, scrape a URL, or upload a PDF /
-  Word / PowerPoint file; structure (headings, tables, slide titles) is
-  recovered directly instead of flattened into a blob
+- **Bring your own material** — paste text, scrape a URL, search the web
+  (with your own Tavily / Brave / Serper key), or upload a PDF / Word /
+  PowerPoint file; structure (headings, tables, slide titles) is recovered
+  directly instead of flattened into a blob. When you'd rather Claude find
+  its own sources — a "Use AI" topic with no material at all — it can
+  search the web itself via Anthropic's native web search tool, no extra
+  key needed
 - **Hybrid local + AI question generation** — a local, zero-API-call
   pattern-extraction pass covers the easy definitional tier; a small AI call
   tops it up with synthesis-style questions the local pass can't produce.

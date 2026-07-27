@@ -69,10 +69,11 @@
       <!-- Step – Material (Upload Data path only) -->
       <div class="wz-step" id="wz-material">
         <h2 class="wz-title">Add your material</h2>
-        <p class="wz-sub">Paste text, add a URL, or upload a file — lecture transcripts work great here too.</p>
+        <p class="wz-sub">Paste text, add a URL, search the web, or upload a file — lecture transcripts work great here too.</p>
         <div class="src-tabs">
           <button class="src-tab active" data-src="paste">Paste</button>
           <button class="src-tab" data-src="url">URL</button>
+          <button class="src-tab" data-src="search">Search</button>
           <button class="src-tab" data-src="file">File</button>
         </div>
         <div class="src-panel active" id="src-paste">
@@ -82,6 +83,10 @@
         <div class="src-panel" id="src-url">
           <input type="url" id="url-input" class="wz-input" placeholder="https://…"/>
           <p class="hint">The page will be scraped for its content.</p>
+        </div>
+        <div class="src-panel" id="src-search">
+          <input type="text" id="search-input" class="wz-input" placeholder="e.g. The French Revolution causes and timeline"/>
+          <p class="hint">Finds and reads a handful of web pages on this topic. Needs a search provider key — add one under Settings → Search Provider.</p>
         </div>
         <div class="src-panel" id="src-file">
           <label class="file-drop" id="file-drop">
@@ -575,6 +580,31 @@
           <div class="apikey-links">
             <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Get an API key →</a>
             <button class="ghost-btn hidden" id="btn-apikey-clear">Clear key</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3 class="section-label">Search Provider (optional)</h3>
+        <p class="hint">Lets the wizard's "Search" material source find and read web pages for a topic. Not required — paste, URL, and file uploads work without it.</p>
+        <div class="setting-row">
+          <span class="setting-key">Provider</span>
+          <select id="s-search-provider" class="setting-select">
+            <option value="tavily">Tavily</option>
+            <option value="brave">Brave Search</option>
+            <option value="serper">Serper (Google)</option>
+          </select>
+        </div>
+        <div class="setting-row col">
+          <span class="setting-key">API key</span>
+          <div class="apikey-row">
+            <input type="password" id="s-search-key-input" class="wz-input" placeholder="API key…" autocomplete="off" spellcheck="false"/>
+            <button class="primary-btn" id="btn-search-key-save">Save</button>
+          </div>
+          <p class="hint" id="search-key-status" aria-live="polite"></p>
+          <div class="apikey-links">
+            <a href="https://tavily.com" target="_blank" rel="noopener" id="search-key-get-link">Get a Tavily key →</a>
+            <button class="ghost-btn hidden" id="btn-search-key-clear">Clear key</button>
           </div>
         </div>
       </div>

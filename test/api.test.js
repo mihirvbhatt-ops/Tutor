@@ -82,6 +82,24 @@ test('POST /api/evaluate without required fields returns 400', async () => {
   assert.ok((await res.json()).error);
 });
 
+test('POST /api/settings/search-key without an apiKey returns 400 (never reaches the config file)', async () => {
+  const res = await post('/api/settings/search-key', { provider: 'tavily' });
+  assert.equal(res.status, 400);
+  assert.ok((await res.json()).error);
+});
+
+test('POST /api/settings/search-key with an unknown provider returns 400 (never reaches the config file)', async () => {
+  const res = await post('/api/settings/search-key', { apiKey: 'some-key', provider: 'bing' });
+  assert.equal(res.status, 400);
+  assert.ok((await res.json()).error);
+});
+
+test('POST /api/topics with source "search" but no query returns 400', async () => {
+  const res = await post('/api/topics', { name: 'No Query Topic', source: 'search' });
+  assert.equal(res.status, 400);
+  assert.ok((await res.json()).error);
+});
+
 test('POST /api/upload with no file returns 400', async () => {
   const res = await fetch(base + '/api/upload', { method: 'POST', body: new FormData() });
   assert.equal(res.status, 400);

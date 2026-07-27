@@ -27,6 +27,7 @@ get('btn-create-topic').addEventListener('click', () => {
   get('paste-area').value = '';
   get('paste-count').textContent = '';
   get('url-input').value = '';
+  get('search-input').value = '';
   get('wz-name-input').value = '';
   qa('#wz-source .mode-card').forEach(c => c.classList.remove('selected'));
 
@@ -171,6 +172,11 @@ get('btn-wz-material-next').addEventListener('click', async () => {
   } else if (materialType === 'url') {
     wizardData.material = get('url-input').value.trim();
     wizardData.materialSource = 'url';
+  } else if (materialType === 'search') {
+    const query = get('search-input').value.trim();
+    if (!query) { alert('Enter something to search for, or switch to Paste/URL/File.'); return; }
+    wizardData.material = query;
+    wizardData.materialSource = 'search';
   } else if (materialType === 'file') {
     if (!uploadedFileText) { alert('Choose a file to upload, or switch to Paste/URL.'); return; }
     wizardData.material = get('file-review-text').value.trim();
@@ -356,14 +362,16 @@ async function runWizardSession() {
     // the id this call returns (instead of re-fetching and grabbing
     // topics[0]) also fixes roadmap #11, where a stale or unrelated topic
     // could get picked up as "the one just created".
-    const c1 = addCheck('Saving topic…');
-    msg.textContent = 'Saving topic…';
+    const savingLabel = wizardData.materialSource === 'search' ? 'Searching the web…' : 'Saving topic…';
+    const c1 = addCheck(savingLabel);
+    msg.textContent = savingLabel;
 
+    const scrapedServerSide = wizardData.materialSource === 'url' || wizardData.materialSource === 'search';
     const topic = await postWithRetry('/api/topics', {
       name:      wizardData.topic,
-      content:   wizardData.materialSource === 'url' ? '' : wizardData.material,
+      content:   scrapedServerSide ? '' : wizardData.material,
       source:    wizardData.materialSource || 'none',
-      sourceRef: wizardData.materialSource === 'url' ? wizardData.material : ''
+      sourceRef: scrapedServerSide ? wizardData.material : ''
     }, signal);
     if (!topic || !topic.id) throw new Error('Topic was not saved. Check your API key and try again.');
     doneCheck(c1);
