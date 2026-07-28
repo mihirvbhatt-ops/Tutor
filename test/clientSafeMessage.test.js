@@ -22,6 +22,25 @@ test('genericizes even when the error has an unrelated .code (e.g. a Node system
   assert.equal(clientSafeMessage(err), 'Something went wrong — please try again.');
 });
 
+// roadmap #3 — a local model that isn't running is the user's own setup, and
+// the message names the fix ("is it running? `ollama serve`"). Genericizing
+// it would surface as "check the API key", which is the wrong instruction.
+test('passes through the message for local-inference errors', () => {
+  for (const code of ['LOCAL_INFERENCE_UNAVAILABLE', 'LOCAL_INFERENCE_BAD_OUTPUT']) {
+    const err = Object.assign(new Error('Can\'t reach Ollama at http://127.0.0.1:11434 — is it running? (`ollama serve`)'), { code });
+    assert.equal(clientSafeMessage(err), err.message);
+  }
+});
+
+test('a local-inference message survives a custom fallback being supplied', () => {
+  // The generate-questions handler passes an API-key-flavoured fallback; a
+  // local failure must not be relabelled as a key problem by it.
+  const err = Object.assign(new Error('Can\'t reach Ollama at http://127.0.0.1:11434 — is it running? (`ollama serve`)'), {
+    code: 'LOCAL_INFERENCE_UNAVAILABLE'
+  });
+  assert.equal(clientSafeMessage(err, 'AI question generation failed — check the API key and try again.'), err.message);
+});
+
 test('accepts a custom fallback message', () => {
   const err = new Error('some internal detail');
   assert.equal(clientSafeMessage(err, 'Custom fallback.'), 'Custom fallback.');

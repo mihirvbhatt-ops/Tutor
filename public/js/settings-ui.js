@@ -2,6 +2,7 @@
 function syncSettingsUI() {
   loadApiKeyStatus();
   loadSearchKeyStatus();
+  loadLocalModelStatus();
   get('s-font').value    = settings.fontFamily;
   get('s-size').value    = settings.fontSize;
   get('size-val').textContent = settings.fontSize + 'px';
@@ -219,6 +220,137 @@ get('btn-search-key-clear').addEventListener('click', async () => {
   await del('/api/settings/search-key');
   await loadSearchKeyStatus();
 });
+
+// ── Local model / inference routing (roadmap #3) ────────────────────────────
+// Optional and off by default. Unlike the two key sections above — where the
+// only question is "is it set" — this one's job is to make the *consequences*
+// of going local visible: which parts of the app it affects, what the model
+// can't do, and what still leaves the device anyway. A silent quality drop
+// the user can't connect back to a setting they changed is the failure mode
+// worth designing against here.
+const ROUTE_SELECTS = { grading: 's-route-grading', generation: 's-route-generation', agent: 's-route-agent' };
+
+async function loadLocalModelStatus() {
+  let status;
+  try { status = await getJson('/api/settings/local-model'); }
+  catch { return null; }
+
+  // The host input shows the resolved host (which may come from OLLAMA_HOST)
+  // rather than only what was typed here, so what the app will actually
+  // contact is never ambiguous.
+  get('s-ollama-host').value = status.host || '';
+  get('s-ollama-model').value = status.model || '';
+  renderLocalModelStatus(status);
+  renderRouting(status);
+  return status;
+}
+
+function renderLocalModelStatus(status) {
+  const statusEl = get('ollama-status');
+  statusEl.classList.remove('ok', 'err');
+  if (status.model) {
+    statusEl.classList.add('ok');
+    statusEl.textContent = status.hostSource === 'env'
+      ? `✓ ${status.model} at ${status.host} (host from the OLLAMA_HOST environment variable)`
+      : `✓ ${status.model} at ${status.host}`;
+  } else {
+    statusEl.textContent = 'Not configured — everything runs on Claude.';
+  }
+  get('btn-ollama-clear').classList.toggle('hidden', !status.model);
+}
+
+// Routing is only meaningful once a model exists, and only honoured for the
+// call sites the server reports as active — the rest stay visible (so the
+// shape of the feature is clear) but disabled, rather than looking like
+// working controls that quietly do nothing.
+function renderRouting(status) {
+  get('ollama-routing').classList.toggle('hidden', !status.model);
+  if (!status.model) return;
+
+  const active = status.activeCallSites || [];
+  for (const [site, id] of Object.entries(ROUTE_SELECTS)) {
+    const sel = get(id);
+    sel.value = status.routing?.[site] || 'anthropic';
+    const isActive = active.includes(site);
+    sel.disabled = !isActive;
+    sel.closest('.setting-row').classList.toggle('pending', !isActive);
+    const sub = sel.closest('.setting-row').querySelector('.setting-sub');
+    if (sub && !isActive && !sub.dataset.original) {
+      sub.dataset.original = sub.textContent;
+      sub.textContent = `${sub.textContent} — not wired up yet`;
+    }
+  }
+}
+
+get('btn-ollama-save').addEventListener('click', async () => {
+  const statusEl = get('ollama-status');
+  const model = get('s-ollama-model').value.trim();
+  if (!model) {
+    statusEl.classList.remove('ok');
+    statusEl.classList.add('err');
+    statusEl.textContent = 'Enter a model name first, e.g. llama3.1:8b';
+    return;
+  }
+
+  const btn = get('btn-ollama-save');
+  btn.disabled = true;
+  statusEl.classList.remove('ok', 'err');
+  statusEl.textContent = 'Checking Ollama…';
+
+  try {
+    const data = await post('/api/settings/local-model', { host: get('s-ollama-host').value.trim(), model });
+    await loadLocalModelStatus();
+    statusEl.classList.add('ok');
+    // supportsTools is null when Ollama is too old to report capabilities —
+    // reported as unknown rather than assumed either way.
+    const toolNote = data.supportsTools === false
+      ? " This model doesn't support tools, so it can't run explanations or chat."
+      : data.supportsTools === null ? " Couldn't confirm tool support for this model." : '';
+    statusEl.textContent = `✓ ${data.model} is ready at ${data.host}.${toolNote}`;
+  } catch (err) {
+    statusEl.classList.add('err');
+    statusEl.textContent = err.message || 'Could not reach Ollama.';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+get('btn-ollama-clear').addEventListener('click', async () => {
+  await del('/api/settings/local-model'); // also resets routing back to Claude
+  await loadLocalModelStatus();
+});
+
+// Saved on change rather than behind a button: each select is one
+// independent choice, and there's nothing to validate across them.
+for (const id of Object.values(ROUTE_SELECTS)) {
+  get(id).addEventListener('change', async () => {
+    const statusEl = get('ollama-routing-status');
+    const routing = Object.fromEntries(
+      Object.entries(ROUTE_SELECTS).map(([site, selId]) => [site, get(selId).value])
+    );
+
+    statusEl.classList.remove('ok', 'warn');
+    statusEl.textContent = 'Saving…';
+    try {
+      const data = await post('/api/settings/inference-routing', routing);
+      // Warnings are the point of this section — a caveat the server raised
+      // (no tool support, search still leaving the device) is shown instead
+      // of a success message, not alongside one.
+      if (data.warnings?.length) {
+        statusEl.classList.add('warn');
+        statusEl.textContent = `⚠ ${data.warnings.join(' ')}`;
+      } else {
+        statusEl.classList.add('ok');
+        const local = Object.entries(data.routing).filter(([, p]) => p === 'ollama').length;
+        statusEl.textContent = local ? `✓ Saved — ${local} of 3 running locally.` : '✓ Saved — everything runs on Claude.';
+      }
+    } catch (err) {
+      statusEl.classList.add('warn');
+      statusEl.textContent = err.message || 'Could not save routing.';
+      await loadLocalModelStatus(); // snap the selects back to what's actually saved
+    }
+  });
+}
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 // roadmap #18 — the previous hand-rolled regex parser had no support for

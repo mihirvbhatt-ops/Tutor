@@ -12,6 +12,10 @@
   --glow:    rgba(108,99,255,0.18);
   --green:   #34c97a;
   --red:     #e05555;
+  /* Warnings that aren't failures — e.g. a routing choice that saved but
+     comes with a caveat (roadmap #3). Distinct from --red, which means the
+     action didn't happen. */
+  --amber:   #e0a355;
   --font:    -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
   --fsize:   16px;
   --nav-h:   66px;
@@ -837,6 +841,24 @@ a.ghost-btn{display:inline-block;text-decoration:none;text-align:center}
 .apikey-links .ghost-btn{margin-left:auto;padding:6px 14px;font-size:.8rem}
 #apikey-status.ok{color:var(--green)}
 #apikey-status.err{color:var(--red)}
+#search-key-status.ok{color:var(--green)}
+#search-key-status.err{color:var(--red)}
+
+/* Local model / routing (roadmap #3) — the routing rows carry a second line
+   naming what each call site actually covers, since "grading" and "agent"
+   mean nothing without it. */
+#ollama-status.ok{color:var(--green)}
+#ollama-status.err{color:var(--red)}
+#ollama-routing-status.ok{color:var(--green)}
+#ollama-routing-status.warn{color:var(--amber)}
+/* The routing rows sit inside their own wrapper, so they don't inherit
+   .settings-section's gap — restate it here or they render cramped. */
+#ollama-routing{display:flex;flex-direction:column;gap:16px}
+.setting-sub{display:block;color:var(--ink3);font-size:.76rem;margin-top:2px;font-weight:400}
+/* A call site whose routing isn't honoured yet stays visible but inert, so
+   the shape of the feature is clear without pretending the control works. */
+.setting-row.pending{opacity:.55}
+.setting-row.pending .setting-select{cursor:not-allowed}
 
 .size-row{display:flex;align-items:center;gap:10px;flex:1;justify-content:flex-end}
 .size-a{color:var(--ink2)}

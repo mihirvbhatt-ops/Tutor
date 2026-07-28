@@ -10,8 +10,11 @@ import Anthropic from '@anthropic-ai/sdk';
 import { toolDefinitions, executeTool } from './tools/study.js';
 import {
   getApiKey, getApiKeySource, getProvider, saveApiKey, clearApiKey,
-  getSearchProvider, getSearchApiKey, getSearchApiKeySource, saveSearchConfig, clearSearchConfig
+  getSearchProvider, getSearchApiKey, getSearchApiKeySource, saveSearchConfig, clearSearchConfig,
+  getLocalModelConfig, getLocalModelHostSource, saveLocalModelConfig, clearLocalModelConfig,
+  getInferenceRouting, saveInferenceRouting
 } from './db/config.js';
+import { probeOllama, ollamaComplete, capabilitiesOf, CALL_SITES } from './tools/inferenceProvider.js';
 import { localGrade } from './tools/similarity.js';
 import { buildLocalQuestions } from './tools/localExtract.js';
 import { extractDocxText, extractPptxText } from './tools/fileExtract.js';
@@ -58,12 +61,23 @@ class NoApiKeyError extends Error {
 // fragments, stack-trace text) to whatever's on the other end of the
 // request — harmless today since that's always the same person's own
 // browser, but not once this is anything but strictly single-user.
-// NoApiKeyError's message is the one deliberate exception: it's written
-// for the Settings UI to show, not an accident. Everything else gets a
-// generic message here; the real error is still logged server-side by
-// each catch block for debugging.
+// Everything else gets a generic message here; the real error is still
+// logged server-side by each catch block for debugging.
+//
+// The exceptions are messages deliberately written to be read by the user
+// and describing their own configuration rather than the server's innards:
+// a missing API key, and (roadmap #3) a local model that isn't reachable or
+// isn't behaving. Without the local-inference codes here, "Can't reach
+// Ollama at … — is it running?" would surface as "check the API key",
+// pointing the user at the wrong thing entirely.
+const USER_FACING_ERROR_CODES = new Set([
+  'NO_API_KEY',
+  'LOCAL_INFERENCE_UNAVAILABLE',
+  'LOCAL_INFERENCE_BAD_OUTPUT'
+]);
+
 function clientSafeMessage(err, fallback = 'Something went wrong — please try again.') {
-  return err?.code === 'NO_API_KEY' ? err.message : fallback;
+  return USER_FACING_ERROR_CODES.has(err?.code) ? err.message : fallback;
 }
 
 function requireApiKey() {
@@ -328,19 +342,78 @@ app.post('/api/chat/reset', (req, res) => {
 // understanding — still reaches the model, on the cheaper Haiku tier since
 // this is an isolated classification task, not open-ended tutoring.
 
+// Shared by both provider paths below so the two can't drift apart in
+// wording — a grading prompt that differs by provider would make the
+// local-vs-Claude comparison meaningless.
+const EVALUATE_SYSTEM =
+  'You are a quiz answer evaluator. Accept answers that demonstrate correct understanding ' +
+  'even if worded differently from the model answer. Be fair and brief. Respond ONLY with ' +
+  'valid JSON — no markdown, no explanation outside the JSON.';
+
+const evaluatePrompt = (question, correctAnswer, userAnswer) =>
+  `Question: ${question}\nModel answer: ${correctAnswer}\nStudent answered: "${userAnswer}"\n\n` +
+  `Respond with this exact JSON shape:\n{"correct": true, "feedback": "one concise sentence"}`;
+
+// Ollama constrains generation to this schema at the sampler, so the local
+// path can't produce the malformed JSON the Anthropic path needs its
+// salvage-the-intent fallback parser for.
+const EVALUATE_SCHEMA = {
+  type: 'object',
+  properties: {
+    correct:  { type: 'boolean' },
+    feedback: { type: 'string' }
+  },
+  required: ['correct', 'feedback']
+};
+
 app.post('/api/evaluate', async (req, res) => {
   const { question, correctAnswer, userAnswer } = req.body;
   if (!question || !userAnswer) {
     return res.status(400).json({ error: 'question and userAnswer are required' });
   }
 
+  // Runs regardless of routing — it costs nothing either way, and it means
+  // the model (local or hosted) only ever sees the genuinely ambiguous
+  // answers rather than the exact matches.
   if (correctAnswer) {
     const { decision } = localGrade(correctAnswer, userAnswer);
     if (decision === 'accept') {
-      return res.json({ correct: true, feedback: 'Matches the expected answer.' });
+      return res.json({ correct: true, feedback: 'Matches the expected answer.', engine: 'heuristic' });
     }
     if (decision === 'reject') {
-      return res.json({ correct: false, feedback: `Doesn't match — the expected answer was: ${correctAnswer}` });
+      return res.json({ correct: false, feedback: `Doesn't match — the expected answer was: ${correctAnswer}`, engine: 'heuristic' });
+    }
+  }
+
+  // roadmap #3 — the user routes this call site to a local model from
+  // Settings; Anthropic remains the default. A local failure is reported as
+  // one rather than silently retried against Anthropic: the user opted out
+  // of paid inference here, so quietly spending their API budget when Ollama
+  // isn't running would be the wrong kind of helpful. The distinct code lets
+  // the frontend offer that fallback as a choice instead.
+  if (getInferenceRouting().grading === 'ollama') {
+    const { host, model } = getLocalModelConfig();
+    const result = await ollamaComplete({
+      host, model,
+      system:     EVALUATE_SYSTEM,
+      messages:   [{ role: 'user', content: evaluatePrompt(question, correctAnswer, userAnswer) }],
+      maxTokens:  200,
+      jsonSchema: EVALUATE_SCHEMA
+    });
+    if (result.error) {
+      return res.status(503).json({ error: result.error, code: 'LOCAL_INFERENCE_UNAVAILABLE' });
+    }
+    try {
+      const parsed = JSON.parse(result.text);
+      return res.json({ correct: !!parsed.correct, feedback: String(parsed.feedback || ''), engine: 'ollama' });
+    } catch {
+      // Schema-constrained output shouldn't reach here; if it does, the
+      // model or Ollama build isn't honouring `format`, which is a setup
+      // problem the user needs told about rather than a gradeable answer.
+      return res.status(502).json({
+        error: `${model} returned output that didn't match the requested JSON shape.`,
+        code:  'LOCAL_INFERENCE_BAD_OUTPUT'
+      });
     }
   }
 
@@ -349,10 +422,10 @@ app.post('/api/evaluate', async (req, res) => {
     const response = await withRetry(() => client.messages.create({
       model:      'claude-haiku-4-5',
       max_tokens: 200,
-      system:     'You are a quiz answer evaluator. Accept answers that demonstrate correct understanding even if worded differently from the model answer. Be fair and brief. Respond ONLY with valid JSON — no markdown, no explanation outside the JSON.',
+      system:     EVALUATE_SYSTEM,
       messages: [{
         role: 'user',
-        content: `Question: ${question}\nModel answer: ${correctAnswer}\nStudent answered: "${userAnswer}"\n\nRespond with this exact JSON shape:\n{"correct": true, "feedback": "one concise sentence"}`
+        content: evaluatePrompt(question, correctAnswer, userAnswer)
       }]
     }));
 
@@ -374,7 +447,7 @@ app.post('/api/evaluate', async (req, res) => {
       }
       result = { correct, feedback: raw.slice(0, 200) };
     }
-    res.json(result);
+    res.json({ ...result, engine: 'anthropic' });
   } catch (err) {
     if (err.code !== 'NO_API_KEY') console.error(err);
     res.status(err.status || 500).json({ error: clientSafeMessage(err), code: err.code });
@@ -396,22 +469,60 @@ const HARD_TIER_COUNT = 3;
 // the small hard-tier count — same target size local extraction aims for.
 const FULL_AI_COUNT = 10;
 
-async function generateHardQuestions(topic, type, count, { fullSet = false } = {}) {
-  const client = requireApiKey();
-  const shapeHint = type === 'mcq'
+// Both provider paths build the same instruction text, so a prompt tweak
+// can't land on one and not the other — that would make comparing local
+// output against Claude's meaningless.
+function questionShapeHint(type) {
+  return type === 'mcq'
     ? '"type":"mcq","options":[four strings, one of which equals answer exactly]'
     : `"type":"${type}"`;
+}
 
+function questionSystemPrompt(fullSet) {
   // The hard tier is deliberately synthesis-only (why/how/compare) since it
   // exists to cover what local extraction can't. "AI only" mode has nothing
   // else covering plain factual recall, so it needs a well-rounded mix instead.
-  let system = fullSet
+  return fullSet
     ? 'You write clear study questions from reference material — a well-rounded mix of straightforward ' +
       'factual/definitional recall and deeper why/how/compare/relate understanding. Respond ONLY with a ' +
       'valid JSON array — no markdown, no explanation outside the JSON.'
     : 'You write hard, synthesis-level study questions from reference material — the kind that need ' +
       'real understanding (why/how/compare/relate), not recall of a single fact. Respond ONLY with a ' +
       'valid JSON array — no markdown, no explanation outside the JSON.';
+}
+
+function questionInstructions(type, count, fullSet) {
+  return `Write exactly ${count} ${fullSet ? '' : 'hard '}questions of type "${type}" from this material. Each array element: ` +
+    `{"question":"...","answer":"...",${questionShapeHint(type)}}. ` +
+    (type === 'mcq'
+      ? 'Write plausible wrong options grounded in the same material, not random text.'
+      : 'The answer should be concise and gradable — a sentence or two, not an essay.');
+}
+
+// Shared shape check. The Anthropic path has always just dropped items
+// missing a question/answer; the local path additionally enforces the MCQ
+// invariants (exactly four options, one of them the answer) because a
+// smaller model gets those wrong often enough to matter, and a quiz whose
+// correct answer isn't among its options is unanswerable.
+function toQuestionItems(parsed, type) {
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter(q => q && q.question && q.answer)
+    .map(q => ({ question: q.question, answer: q.answer, type, options: type === 'mcq' ? (q.options || null) : null }));
+}
+
+function isUsableMcq(item) {
+  return Array.isArray(item.options) && item.options.length === 4 && item.options.includes(item.answer);
+}
+
+async function generateHardQuestions(topic, type, count, { fullSet = false } = {}) {
+  // roadmap #3 — opt-in per call site from Settings; Anthropic is the default.
+  if (getInferenceRouting().generation === 'ollama') {
+    return generateQuestionsLocally(topic, type, count, { fullSet });
+  }
+
+  const client = requireApiKey();
+  let system = questionSystemPrompt(fullSet);
 
   // roadmap #1 — a "Use AI" topic has no reference material at all (empty
   // content), so unlike the agent loop's tools (static/cached across every
@@ -444,12 +555,7 @@ async function generateHardQuestions(topic, type, count, { fullSet = false } = {
         },
         {
           type: 'text',
-          text:
-            `Write exactly ${count} ${fullSet ? '' : 'hard '}questions of type "${type}" from this material. Each array element: ` +
-            `{"question":"...","answer":"...",${shapeHint}}. ` +
-            (type === 'mcq'
-              ? 'Write plausible wrong options grounded in the same material, not random text.'
-              : 'The answer should be concise and gradable — a sentence or two, not an essay.')
+          text: questionInstructions(type, count, fullSet)
         }
       ]
     }]
@@ -462,10 +568,123 @@ async function generateHardQuestions(topic, type, count, { fullSet = false } = {
   } catch {
     return []; // Malformed output — local items still stand on their own.
   }
-  if (!Array.isArray(parsed)) return [];
-  return parsed
-    .filter(q => q && q.question && q.answer)
-    .map(q => ({ question: q.question, answer: q.answer, type, options: type === 'mcq' ? (q.options || null) : null }));
+  return toQuestionItems(parsed, type);
+}
+
+// ── Local question generation (roadmap #3) ──────────────────────────────────
+// The Ollama counterpart to generateHardQuestions above. Three things differ
+// beyond the transport, each for a reason the Anthropic path doesn't have:
+//
+//  1. Output is schema-constrained at the sampler rather than asked for in
+//     prose, so malformed JSON isn't a failure mode here.
+//  2. There's no server-side web_search equivalent, so the no-material case
+//     is filled by this app's own BYO search provider + scraper and injected
+//     as ordinary text (see gatherSearchMaterial).
+//  3. Reference material is budgeted against a small context window instead
+//     of being sent whole. Silently overflowing it would reintroduce the
+//     truncation bug class fixed in v1.98, just through a different door.
+
+// ~4 chars/token puts this near 3k tokens of material, which leaves room for
+// the system prompt and a full-size answer set inside a typical 8k local
+// context. Deliberately conservative: overshooting degrades output quality
+// invisibly, whereas trimming is at least reported back to the caller.
+const LOCAL_MATERIAL_CHAR_BUDGET = 12000;
+const LOCAL_SEARCH_RESULTS = 3;
+
+function budgetMaterial(text) {
+  if (text.length <= LOCAL_MATERIAL_CHAR_BUDGET) return { text, truncated: false };
+  // Cut at a paragraph break where possible so the model isn't handed a
+  // sentence that stops mid-clause.
+  const slice = text.slice(0, LOCAL_MATERIAL_CHAR_BUDGET);
+  const lastBreak = slice.lastIndexOf('\n\n');
+  return { text: lastBreak > LOCAL_MATERIAL_CHAR_BUDGET / 2 ? slice.slice(0, lastBreak) : slice, truncated: true };
+}
+
+// Stands in for Anthropic's server-side web_search on the local path. Note
+// this is the one place "local inference" still leaves the device — Settings
+// says so at the point the user turns it on.
+async function gatherSearchMaterial(topicName) {
+  const apiKey = getSearchApiKey();
+  if (!apiKey) return null;
+
+  const { results, error } = await webSearch(topicName, getSearchProvider(), apiKey, LOCAL_SEARCH_RESULTS);
+  if (error || !results?.length) return null;
+
+  const pages = [];
+  for (const result of results.slice(0, LOCAL_SEARCH_RESULTS)) {
+    const page = await scrapeUrl(result.url); // already SSRF-hardened
+    if (page?.text) pages.push(`Source: ${page.title || result.title} (${result.url})\n${page.text}`);
+  }
+  return pages.length ? pages.join('\n\n') : null;
+}
+
+function localQuestionSchema(type) {
+  const properties = {
+    question: { type: 'string' },
+    answer:   { type: 'string' }
+  };
+  if (type === 'mcq') {
+    properties.options = { type: 'array', items: { type: 'string' }, minItems: 4, maxItems: 4 };
+  }
+  return {
+    type:  'array',
+    items: { type: 'object', properties, required: Object.keys(properties) }
+  };
+}
+
+async function generateQuestionsLocally(topic, type, count, { fullSet = false } = {}) {
+  const { host, model } = getLocalModelConfig();
+  if (!model) throw Object.assign(new Error('No local model configured.'), { code: 'LOCAL_INFERENCE_UNAVAILABLE', status: 503 });
+
+  let material = topic.content?.trim() || '';
+  if (!material) {
+    material = (await gatherSearchMaterial(topic.name)) || '';
+    if (!material) {
+      // Nothing to work from and no way to find any. Asking a small model to
+      // generate from its own weights is exactly the case it's worst at, so
+      // return empty and let local extraction / the caller's error path
+      // handle it rather than shipping confident invented content.
+      console.warn(`[generate-questions] no material and no search results for "${topic.name}" — skipping local generation`);
+      return [];
+    }
+  }
+
+  const { text, truncated } = budgetMaterial(material);
+  if (truncated) {
+    console.warn(`[generate-questions] reference material for "${topic.name}" trimmed to ${LOCAL_MATERIAL_CHAR_BUDGET} chars for the local model's context window`);
+  }
+
+  const result = await ollamaComplete({
+    host, model,
+    system:     questionSystemPrompt(fullSet),
+    maxTokens:  Math.max(1200, count * 350),
+    jsonSchema: localQuestionSchema(type),
+    messages: [{
+      role: 'user',
+      content: `Reference material for "${topic.name}":\n${text}\n\n${questionInstructions(type, count, fullSet)}`
+    }]
+  });
+
+  if (result.error) {
+    throw Object.assign(new Error(result.error), { code: 'LOCAL_INFERENCE_UNAVAILABLE', status: 503 });
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(result.text);
+  } catch {
+    return []; // Constrained decoding should prevent this; local items still stand alone.
+  }
+
+  const items = toQuestionItems(parsed, type);
+  // Drop unusable MCQs rather than saving a quiz question whose correct
+  // answer isn't one of its options. Generation is free here, so the caller
+  // losing a few items is cheaper than the user hitting an unanswerable one.
+  const usable = type === 'mcq' ? items.filter(isUsableMcq) : items;
+  if (usable.length < items.length) {
+    console.warn(`[generate-questions] ${model} produced ${items.length - usable.length} malformed MCQ item(s) — dropped`);
+  }
+  return usable;
 }
 
 const LOCAL_CAP = 10;
@@ -910,6 +1129,104 @@ app.delete('/api/settings/search-key', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Settings: local inference provider (roadmap #3) ─────────────────────────
+// Opt-in. Anthropic stays the default for every call site; the user decides
+// which ones (if any) run against a local model, and the app reports what
+// that choice costs them rather than picking a routing policy for them.
+
+// Call sites that currently consult getInferenceRouting(). 'agent' accepts
+// and persists a routing choice but doesn't act on it yet, so it's reported
+// separately and shown as not-yet-active in Settings instead of looking like
+// a working control. Add to this as each is wired.
+const ACTIVE_CALL_SITES = ['grading', 'generation'];
+app.get('/api/settings/local-model', (req, res) => {
+  const { host, model } = getLocalModelConfig();
+  res.json({
+    host,
+    hostSource:   getLocalModelHostSource(), // 'env' | 'file' | 'default'
+    model,
+    routing:      getInferenceRouting(),
+    callSites:    CALL_SITES,
+    // Which call sites actually read their routing today. Reported by the
+    // server rather than assumed by the UI so the two can't drift as the
+    // remaining call sites get wired up — a control the user can set but
+    // that silently does nothing is worse than one shown as not-yet-active.
+    activeCallSites: ACTIVE_CALL_SITES,
+    capabilities: { anthropic: capabilitiesOf('anthropic'), ollama: capabilitiesOf('ollama') }
+  });
+});
+
+app.post('/api/settings/local-model', async (req, res) => {
+  const { host, model } = req.body || {};
+  if (!model || typeof model !== 'string' || !model.trim()) {
+    return res.status(400).json({ error: 'model is required' });
+  }
+
+  // Same rationale as the Anthropic key check above — validate before
+  // saving so a wrong port or an un-pulled model surfaces here, in a form
+  // the user is looking at, instead of mid-quiz on the next real call.
+  const probe = await probeOllama({ host, model: model.trim() });
+  if (probe.error) return res.status(400).json({ error: probe.error });
+  if (!probe.hasModel) {
+    return res.status(400).json({
+      error: `Ollama is running, but "${model.trim()}" isn't pulled yet — run \`ollama pull ${model.trim()}\` first.`,
+      models: probe.models
+    });
+  }
+
+  saveLocalModelConfig(host, model);
+  res.status(201).json({
+    ok:            true,
+    host:          probe.host,
+    model:         model.trim(),
+    supportsTools: probe.supportsTools, // null when Ollama is too old to report it
+    shadowedByEnv: getLocalModelHostSource() === 'env'
+  });
+});
+
+app.delete('/api/settings/local-model', (req, res) => {
+  clearLocalModelConfig(); // also resets routing — see db/config.js
+  res.json({ ok: true, routing: getInferenceRouting() });
+});
+
+// Routing is saved separately from the model itself: changing which call
+// sites run locally is a far more frequent action than changing the model,
+// and shouldn't require re-probing the host every time.
+app.post('/api/settings/inference-routing', async (req, res) => {
+  const routing = req.body || {};
+  const wantsLocal = CALL_SITES.filter(site => routing[site] === 'ollama');
+
+  const { host, model } = getLocalModelConfig();
+  if (wantsLocal.length && !model) {
+    return res.status(400).json({ error: 'Configure a local model before routing anything to it.' });
+  }
+
+  // Only probed when the agent loop is involved — that's the one call site
+  // that needs tool support, and the only case where the answer changes what
+  // we tell the user. A warning rather than a rejection: supportsTools is
+  // null on older Ollama builds, and refusing on "unknown" would block a
+  // setup that may well work.
+  const warnings = [];
+  if (routing.agent === 'ollama') {
+    const probe = await probeOllama({ host, model });
+    if (probe.error) warnings.push(probe.error);
+    else if (probe.supportsTools === false) {
+      warnings.push(`${model} doesn't advertise tool support — the agent loop (explanations, study guides, chat) needs it and will likely fail.`);
+    } else if (probe.supportsTools === null) {
+      warnings.push(`Couldn't confirm whether ${model} supports tool use — if explanations fail, route the agent call site back to Anthropic.`);
+    }
+  }
+
+  // Search still leaves the device even with inference fully local, so say
+  // so at the point of choice rather than letting "local" imply "no egress".
+  if (routing.generation === 'ollama' && getSearchApiKey()) {
+    warnings.push('Topics generated without reference material still send search queries to your search provider — local inference doesn\'t make those calls local.');
+  }
+
+  saveInferenceRouting(routing);
+  res.json({ ok: true, routing: getInferenceRouting(), warnings });
+});
+
 // ── Fallback error handling ───────────────────────────────────────────────────
 // Most routes above already validate input and return 400/404 with a real
 // status code. This is the safety net for anything that still throws
@@ -935,4 +1252,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   app.listen(PORT, () => console.log(`AI Tutor running at http://localhost:${PORT}`));
 }
 
-export { app, initDb, markCacheBreakpoint, CACHED_TOOLS, clientSafeMessage };
+export {
+  app, initDb, markCacheBreakpoint, CACHED_TOOLS, clientSafeMessage,
+  // roadmap #3 — the local-generation guards, exported for test/api.test.js
+  // rather than exercised only through a live model.
+  budgetMaterial, isUsableMcq, localQuestionSchema, LOCAL_MATERIAL_CHAR_BUDGET
+};

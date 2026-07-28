@@ -92,3 +92,66 @@ export function clearSearchConfig() {
   delete config.searchApiKey;
   writeConfig(config);
 }
+
+// ── Local inference provider / routing (roadmap #3) ─────────────────────────
+// Anthropic stays the default for every call site; Ollama is opt-in, and
+// opted into per call site rather than globally, so the user can push the
+// cheap high-volume calls local and keep Claude for what it's better at.
+// OLLAMA_HOST is Ollama's own conventional env var, so it wins over the
+// saved file the same way ANTHROPIC_API_KEY does above — a dev who already
+// exports it shouldn't have to re-enter it in Settings.
+const DEFAULT_OLLAMA_HOST = 'http://127.0.0.1:11434';
+const CALL_SITES = ['grading', 'generation', 'agent'];
+
+export function getLocalModelConfig() {
+  const config = readConfig();
+  return {
+    host:  process.env.OLLAMA_HOST || config.ollamaHost || DEFAULT_OLLAMA_HOST,
+    model: config.ollamaModel || null
+  };
+}
+
+// 'env' | 'file' | 'default' — same rationale as getApiKeySource above: the
+// UI needs to explain why the host it's using isn't the one just typed in.
+export function getLocalModelHostSource() {
+  if (process.env.OLLAMA_HOST) return 'env';
+  if (readConfig().ollamaHost) return 'file';
+  return 'default';
+}
+
+export function saveLocalModelConfig(host, model) {
+  writeConfig({
+    ...readConfig(),
+    ollamaHost:  host?.trim() || DEFAULT_OLLAMA_HOST,
+    ollamaModel: model?.trim() || null
+  });
+}
+
+// Clearing the local model also resets routing — leaving a call site pointed
+// at a provider that no longer has a model configured would fail on the next
+// real call instead of here, where the user can still see why.
+export function clearLocalModelConfig() {
+  const config = readConfig();
+  delete config.ollamaHost;
+  delete config.ollamaModel;
+  delete config.inferenceRouting;
+  writeConfig(config);
+}
+
+// Unknown call sites and unknown providers are dropped rather than trusted —
+// this comes straight off a request body, and a typo'd key silently routing
+// nothing is better than one that throws deep inside a generation call.
+export function getInferenceRouting() {
+  const saved = readConfig().inferenceRouting || {};
+  return Object.fromEntries(
+    CALL_SITES.map(site => [site, saved[site] === 'ollama' ? 'ollama' : 'anthropic'])
+  );
+}
+
+export function saveInferenceRouting(routing) {
+  const next = getInferenceRouting();
+  for (const site of CALL_SITES) {
+    if (routing?.[site] === 'ollama' || routing?.[site] === 'anthropic') next[site] = routing[site];
+  }
+  writeConfig({ ...readConfig(), inferenceRouting: next });
+}

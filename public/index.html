@@ -610,6 +610,53 @@
       </div>
 
       <div class="settings-section">
+        <h3 class="section-label">Local Model (optional)</h3>
+        <p class="hint">Run inference on your own machine with <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a> instead of sending it to Claude — no API cost, and your material never leaves the device. A laptop-sized model is noticeably weaker at grading nuance and multi-step work, so you choose which parts use it rather than switching everything at once.</p>
+        <div class="setting-row col">
+          <span class="setting-key">Ollama host</span>
+          <input type="text" id="s-ollama-host" class="wz-input" placeholder="http://127.0.0.1:11434" autocomplete="off" spellcheck="false"/>
+        </div>
+        <div class="setting-row col">
+          <span class="setting-key">Model</span>
+          <div class="apikey-row">
+            <input type="text" id="s-ollama-model" class="wz-input" placeholder="llama3.1:8b" autocomplete="off" spellcheck="false"/>
+            <button class="primary-btn" id="btn-ollama-save">Save</button>
+          </div>
+          <p class="hint" id="ollama-status" aria-live="polite"></p>
+          <div class="apikey-links">
+            <a href="https://ollama.com/library" target="_blank" rel="noopener">Browse models →</a>
+            <button class="ghost-btn hidden" id="btn-ollama-clear">Clear</button>
+          </div>
+        </div>
+
+        <div id="ollama-routing" class="hidden">
+          <h4 class="section-label" style="margin-top:1.1rem">What runs locally</h4>
+          <div class="setting-row">
+            <span class="setting-key">Grading<small class="setting-sub">Marking written quiz answers</small></span>
+            <select id="s-route-grading" class="setting-select">
+              <option value="anthropic">Claude</option>
+              <option value="ollama">Local model</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <span class="setting-key">Question generation<small class="setting-sub">Quizzes and flashcards</small></span>
+            <select id="s-route-generation" class="setting-select">
+              <option value="anthropic">Claude</option>
+              <option value="ollama">Local model</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <span class="setting-key">Explanations &amp; chat<small class="setting-sub">Needs tool support</small></span>
+            <select id="s-route-agent" class="setting-select">
+              <option value="anthropic">Claude</option>
+              <option value="ollama">Local model</option>
+            </select>
+          </div>
+          <p class="hint" id="ollama-routing-status" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <h3 class="section-label">Typography</h3>
         <div class="setting-row">
           <span class="setting-key">Font family</span>

@@ -14,7 +14,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_DB = path.join(__dirname, '.test-tutor.db');
 for (const suffix of ['', '-wal', '-shm']) fs.rmSync(TEST_DB + suffix, { force: true });
 
+// roadmap #3 — /api/evaluate now consults the saved inference routing, so
+// this suite needs its own throwaway config file too. Without it these tests
+// would read the developer's real db/config.json and take a different code
+// path the moment they'd routed grading to a local model.
+const TEST_CONFIG = path.join(__dirname, '.test-api-config.json');
+fs.rmSync(TEST_CONFIG, { force: true });
+
 process.env.TUTOR_DB_PATH = TEST_DB;
+process.env.TUTOR_CONFIG_PATH = TEST_CONFIG;
 process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || 'sk-test-not-a-real-key';
 
 const { app, initDb } = await import('../server.js');
@@ -32,6 +40,7 @@ before(async () => {
 after(async () => {
   await new Promise(resolve => server.close(resolve));
   for (const suffix of ['', '-wal', '-shm']) fs.rmSync(TEST_DB + suffix, { force: true });
+  fs.rmSync(TEST_CONFIG, { force: true });
 });
 
 const get   = p        => fetch(base + p);
@@ -277,6 +286,77 @@ test('POST /api/evaluate auto-rejects a clearly off-topic answer without calling
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.correct, false);
+});
+
+// ── #3 — local inference provider settings & routing ────────────────────────
+// The Ollama adapter itself is covered in test/inferenceProvider.test.js
+// against a stub server. These cover the settings surface: what the app
+// refuses to save, and that routing choices survive a round trip. Nothing
+// here reaches a real Ollama — the host defaults to a loopback port with
+// nothing listening, which is exactly the "not running" case to assert on.
+
+test('GET /api/settings/local-model reports the defaults and both capability sets', async () => {
+  const res = await get('/api/settings/local-model');
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.model, null);
+  assert.deepEqual(body.routing, { grading: 'anthropic', generation: 'anthropic', agent: 'anthropic' });
+  assert.deepEqual(body.callSites, ['grading', 'generation', 'agent']);
+  // The UI needs these to explain what changes when a call site goes local.
+  assert.equal(body.capabilities.anthropic.promptCaching, true);
+  assert.equal(body.capabilities.ollama.constrainedJson, true);
+});
+
+test('POST /api/settings/local-model requires a model name', async () => {
+  const res = await post('/api/settings/local-model', { host: 'http://127.0.0.1:11434' });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /model is required/);
+});
+
+test('POST /api/settings/local-model refuses to save when the host is unreachable', async () => {
+  // Same contract as the Anthropic key endpoint: validate before saving so a
+  // broken setup surfaces in Settings, not mid-quiz.
+  const res = await post('/api/settings/local-model', { host: 'http://127.0.0.1:1', model: 'llama3.1' });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /Can't reach Ollama/);
+});
+
+test('POST /api/settings/inference-routing refuses local routing with no model configured', async () => {
+  const res = await post('/api/settings/inference-routing', { grading: 'ollama' });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /Configure a local model/);
+  // And nothing was persisted by the rejected call.
+  const after = await (await get('/api/settings/local-model')).json();
+  assert.equal(after.routing.grading, 'anthropic');
+});
+
+test('POST /api/settings/inference-routing accepts an all-Anthropic round trip', async () => {
+  const res = await post('/api/settings/inference-routing', {
+    grading: 'anthropic', generation: 'anthropic', agent: 'anthropic'
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(body.routing, { grading: 'anthropic', generation: 'anthropic', agent: 'anthropic' });
+  assert.deepEqual(body.warnings, []);
+});
+
+test('DELETE /api/settings/local-model clears the model and reports reset routing', async () => {
+  const res = await del('/api/settings/local-model');
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(body.routing, { grading: 'anthropic', generation: 'anthropic', agent: 'anthropic' });
+});
+
+test('/api/evaluate reports which engine graded the answer', async () => {
+  // Provenance labelling — the UI needs this to show the user what produced
+  // a result, so a quality change after switching providers is visible
+  // rather than silent. The heuristic tier answers this one.
+  const res = await post('/api/evaluate', {
+    question: 'What powers photosynthesis?',
+    correctAnswer: 'Sunlight provides the energy for photosynthesis',
+    userAnswer: 'sunlight provides the energy for photosynthesis'
+  });
+  assert.equal((await res.json()).engine, 'heuristic');
 });
 
 // ── #6 — hybrid local + AI question generation ──────────────────────────────
