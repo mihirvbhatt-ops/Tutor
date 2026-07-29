@@ -761,6 +761,71 @@ export function getStatsSummary() {
   };
 }
 
+// ── Export / backup (roadmap #8) ──────────────────────────────────────────────
+// Everything a user has ever studied lives in one tutor.db file, and until
+// now the only way to get it out was to know where that file is and copy it
+// by hand. Two shapes, because they answer different questions:
+//
+//   exportAll()        — every row of every table as plain JSON. Readable,
+//                        diffable, and useful to anything that isn't this
+//                        app. Lossy in one direction only: it captures the
+//                        data, not the schema.
+//   exportDbSnapshot() — a byte-for-byte SQLite file. Restoring is "replace
+//                        tutor.db and restart", with no import path to write
+//                        and no chance of a partial reconstruction.
+//
+// The table list is explicit rather than read from sqlite_master so that a
+// future internal/cache table doesn't silently start appearing in what we
+// hand the user as "their data".
+const EXPORT_TABLES = [
+  'topics', 'questions', 'attempts', 'history',
+  'courses', 'course_topics', 'progress_state', 'sessions',
+  'explanations', 'explanation_reads'
+];
+
+// Bumped only if the shape below changes incompatibly — an importer (or a
+// user's own script) should refuse a version it doesn't recognise rather
+// than guess.
+const EXPORT_FORMAT_VERSION = 1;
+
+export function exportAll() {
+  const data = {};
+  for (const table of EXPORT_TABLES) data[table] = query(`SELECT * FROM ${table}`);
+  return {
+    format: 'ai-tutor-export',
+    version: EXPORT_FORMAT_VERSION,
+    exportedAt: new Date().toISOString(),
+    // The migration level the rows were written at — without it, a JSON file
+    // read back years later gives no way to tell which schema it belongs to.
+    schemaVersion: getUserVersion(),
+    backend,
+    counts: Object.fromEntries(EXPORT_TABLES.map(t => [t, data[t].length])),
+    data
+  };
+}
+
+export function exportDbSnapshot() {
+  // sql.js already holds the whole database in memory — the same
+  // serialisation persist() writes to disk.
+  if (backend === 'sql.js') return Buffer.from(db.export());
+
+  // better-sqlite3 runs in WAL mode, so recent writes may live only in
+  // tutor.db-wal — plain fs.readFileSync(DB_PATH) would hand back a file
+  // that's missing whatever the user did most recently, which is the worst
+  // possible failure for a backup (it succeeds, and is quietly stale).
+  // VACUUM INTO takes a read lock and writes a fully checkpointed,
+  // self-contained copy instead.
+  const tmp = `${DB_PATH}.export-${process.pid}-${Date.now()}`;
+  try {
+    // VACUUM INTO refuses to overwrite, so the target must not exist.
+    fs.rmSync(tmp, { force: true });
+    db.exec(`VACUUM INTO '${tmp.replace(/'/g, "''")}'`);
+    return fs.readFileSync(tmp);
+  } finally {
+    fs.rmSync(tmp, { force: true });
+  }
+}
+
 function courseTopicsWithProgress(courseId) {
   const rows = query(`
     SELECT ct.id as ctId, ct.position, ct.prerequisiteId,

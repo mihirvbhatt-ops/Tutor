@@ -352,6 +352,87 @@ for (const id of Object.values(ROUTE_SELECTS)) {
   });
 }
 
+// ── Data export / backup (roadmap #8) ───────────────────────────────────────
+// Both downloads go through fetch rather than a plain <a download> so a
+// failure is visible: an <a> pointing at a route that 500s silently saves the
+// error JSON to disk as if it were the backup, which is precisely the way a
+// backup feature must not fail.
+function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Revoked on the next tick — immediately would race the click in Safari.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function exportStamp() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function downloadExport(url, filename, describe) {
+  const statusEl = get('export-status');
+  // Both buttons disable together: they're two views of the same snapshot,
+  // and running them concurrently just doubles the work for no benefit.
+  const buttons = [get('btn-export-json'), get('btn-export-db')];
+  buttons.forEach(b => (b.disabled = true));
+  statusEl.classList.remove('ok', 'err');
+  statusEl.textContent = 'Preparing…';
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      // The server's error paths all return JSON (see server.js's fallback
+      // handler), so there's a real message to show rather than a status code.
+      let message = 'Could not build the export.';
+      try { message = (await res.json()).error || message; } catch {}
+      throw new Error(message);
+    }
+    const blob = await res.blob();
+    saveBlob(blob, filename);
+    statusEl.classList.add('ok');
+    statusEl.textContent = await describe(blob);
+  } catch (err) {
+    statusEl.classList.add('err');
+    statusEl.textContent = err.message || 'Could not build the export.';
+  } finally {
+    buttons.forEach(b => (b.disabled = false));
+  }
+}
+
+function formatBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+get('btn-export-json').addEventListener('click', () =>
+  downloadExport('/api/export', `ai-tutor-export-${exportStamp()}.json`, async blob => {
+    // The confirmation names what actually came out — "✓ Downloaded" alone
+    // gives no way to notice an export that quietly contained nothing.
+    try {
+      const { counts } = JSON.parse(await blob.text());
+      const parts = [
+        `${counts.topics} topic${counts.topics === 1 ? '' : 's'}`,
+        `${counts.questions} question${counts.questions === 1 ? '' : 's'}`,
+        `${counts.sessions} session${counts.sessions === 1 ? '' : 's'}`
+      ];
+      return `✓ Downloaded — ${parts.join(', ')}.`;
+    } catch {
+      return `✓ Downloaded (${formatBytes(blob.size)}).`;
+    }
+  })
+);
+
+get('btn-export-db').addEventListener('click', () =>
+  downloadExport('/api/export/db', `ai-tutor-backup-${exportStamp()}.db`, async blob =>
+    `✓ Downloaded — ${formatBytes(blob.size)} database file.`
+  )
+);
+
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 // roadmap #18 — the previous hand-rolled regex parser had no support for
 // code fences, tables, links, or nested lists, and its paragraph-wrapping

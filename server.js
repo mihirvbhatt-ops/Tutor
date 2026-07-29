@@ -33,7 +33,8 @@ import {
   addTopicToCourse, removeTopicFromCourse, reorderCourseTopics,
   saveProgress, getProgress, clearProgress,
   startSession, recordSessionAnswer, endSession, deleteSession, listSessions, getStatsSummary,
-  saveExplanation, getExplanation
+  saveExplanation, getExplanation,
+  exportAll, exportDbSnapshot
 } from './db/sqlite.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1044,6 +1045,33 @@ app.get('/api/fonts', (req, res) => res.json(scanFonts()));
 
 // ── Packaged installer & update mechanism (roadmap #4) ──────────────────────
 app.get('/api/update-check', async (req, res) => res.json(await checkForUpdate()));
+
+// ── Data export / backup (roadmap #8) ───────────────────────────────────────
+// "Your data is yours" only means something if there's a way to pick it up
+// and carry it off. Both routes are plain GETs so the browser's own download
+// machinery handles them, and both set Content-Disposition so they land in
+// the user's Downloads folder rather than rendering in a tab.
+//
+// Neither carries any secret: API keys live in db/config.json, not in the
+// database, so there's nothing here to redact before handing it over.
+function exportFilename(ext) {
+  return `ai-tutor-${ext === 'db' ? 'backup' : 'export'}-${new Date().toISOString().slice(0, 10)}.${ext}`;
+}
+
+app.get('/api/export', (req, res) => {
+  // Pretty-printed deliberately: this file's whole point is that the user can
+  // open it and read it, and the size difference is irrelevant next to the
+  // gzip the compression middleware puts over it on the wire anyway.
+  const body = JSON.stringify(exportAll(), null, 2);
+  res.setHeader('Content-Disposition', `attachment; filename="${exportFilename('json')}"`);
+  res.type('application/json').send(body);
+});
+
+app.get('/api/export/db', (req, res) => {
+  const snapshot = exportDbSnapshot();
+  res.setHeader('Content-Disposition', `attachment; filename="${exportFilename('db')}"`);
+  res.type('application/octet-stream').send(snapshot);
+});
 
 // ── Settings: AI provider / API key (roadmap #3) ────────────────────────────
 // The key never round-trips back to the client once saved — only a status

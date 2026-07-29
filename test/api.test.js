@@ -415,3 +415,65 @@ test('POST /api/topics/:id/generate-questions for a missing topic returns 404', 
   const res = await post('/api/topics/nope/generate-questions', { mode: 'quiz' });
   assert.equal(res.status, 404);
 });
+
+// ── #8 — data export / backup ───────────────────────────────────────────────
+// The failure mode worth guarding against here isn't a 500, it's an export
+// that succeeds while being incomplete or stale — a backup nobody discovers
+// is broken until they need it.
+
+test('GET /api/export returns a self-describing JSON dump of every table', async () => {
+  const topic = seedTopic('Exportable Topic');
+  saveQuestions(topic.id, [{ question: 'Exported Q', answer: 'Exported A', type: 'short' }]);
+
+  const res = await get('/api/export');
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type') || '', /application\/json/);
+  // Without a filename the browser saves it as "export" with no extension.
+  assert.match(res.headers.get('content-disposition') || '', /attachment; filename="ai-tutor-export-\d{4}-\d{2}-\d{2}\.json"/);
+
+  const body = await res.json();
+  assert.equal(body.format, 'ai-tutor-export');
+  assert.equal(body.version, 1);
+  assert.equal(typeof body.exportedAt, 'string');
+  assert.equal(typeof body.schemaVersion, 'number');
+
+  // Every table the app writes to has to be present, even when empty —
+  // a missing key is indistinguishable from "you had no courses".
+  for (const table of ['topics', 'questions', 'attempts', 'history', 'courses',
+                       'course_topics', 'progress_state', 'sessions',
+                       'explanations', 'explanation_reads']) {
+    assert.ok(Array.isArray(body.data[table]), `${table} missing from export`);
+    assert.equal(body.counts[table], body.data[table].length, `${table} count disagrees with its rows`);
+  }
+
+  const exported = body.data.topics.find(t => t.id === topic.id);
+  assert.ok(exported, 'seeded topic missing from the export');
+  assert.equal(exported.name, 'Exportable Topic');
+  // Full rows, not the trimmed listTopics() projection — the reference
+  // material is the bulk of what a user would be losing.
+  assert.equal(exported.content, 'Plants convert light into energy.');
+  assert.ok(body.data.questions.some(q => q.question === 'Exported Q'));
+});
+
+test('GET /api/export/db returns a real SQLite file containing the newest writes', async () => {
+  seedTopic('Snapshot Topic');
+
+  const res = await get('/api/export/db');
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-disposition') || '', /attachment; filename="ai-tutor-backup-\d{4}-\d{2}-\d{2}\.db"/);
+
+  const buf = Buffer.from(await res.arrayBuffer());
+  assert.equal(buf.subarray(0, 15).toString('utf8'), 'SQLite format 3');
+
+  // The point of VACUUM INTO over a plain file copy: in WAL mode a topic
+  // written moments ago may still live only in tutor.db-wal, and a snapshot
+  // that silently omits it is a backup that quietly loses recent work.
+  assert.ok(buf.includes(Buffer.from('Snapshot Topic', 'utf8')),
+    'snapshot is missing a row written just before the export (WAL not checkpointed)');
+});
+
+test('the export carries no API key — secrets live in config.json, not the database', async () => {
+  const res = await get('/api/export');
+  const raw = await res.text();
+  assert.ok(!raw.includes(process.env.ANTHROPIC_API_KEY), 'API key leaked into the data export');
+});
