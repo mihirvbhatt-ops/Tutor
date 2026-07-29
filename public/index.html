@@ -733,6 +733,19 @@
       </div>
 
       <div class="settings-section">
+        <h3 class="section-label">Your Data</h3>
+        <p class="hint">Every topic, question, attempt, and session lives in a single file on this machine. Take a copy whenever you like — both downloads are built locally and sent nowhere.</p>
+        <div class="setting-row col">
+          <div class="export-row">
+            <button class="primary-btn" id="btn-export-json">Export as JSON</button>
+            <button class="ghost-btn" id="btn-export-db">Download backup</button>
+          </div>
+          <p class="hint" id="export-status" aria-live="polite"></p>
+          <p class="hint export-note">JSON is readable anywhere and good for keeping or inspecting your own data. The backup is the database file itself — to restore it, put it back as <code>db/tutor.db</code> and restart the app.</p>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <button class="ghost-btn wide" id="btn-reset-settings">Reset to defaults</button>
       </div>
     </div>

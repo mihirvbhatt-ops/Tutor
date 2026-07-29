@@ -841,6 +841,19 @@ a.ghost-btn{display:inline-block;text-decoration:none;text-align:center}
 .apikey-links .ghost-btn{margin-left:auto;padding:6px 14px;font-size:.8rem}
 #apikey-status.ok{color:var(--green)}
 #apikey-status.err{color:var(--red)}
+
+/* Data export (roadmap #8) — two peer actions rather than a field plus a
+   submit button, so unlike .apikey-row nothing here should stretch to fill. */
+.export-row{display:flex;gap:8px;flex-wrap:wrap;width:100%}
+.export-row .primary-btn{width:auto;padding:10px 18px;font-size:.85rem}
+.export-row .ghost-btn{padding:10px 18px}
+.export-note{max-width:52ch}
+.export-note code{
+  font-family:monospace;font-size:.92em;
+  background:var(--bg3);padding:1px 5px;border-radius:5px;
+}
+#export-status.ok{color:var(--green)}
+#export-status.err{color:var(--red)}
 #search-key-status.ok{color:var(--green)}
 #search-key-status.err{color:var(--red)}
 
