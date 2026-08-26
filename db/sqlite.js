@@ -123,6 +123,17 @@ const SCHEMA_SQL = `
 
 export async function initDb() {
   try {
+    // roadmap #4 — the sql.js fallback only ever ran when better-sqlite3
+    // genuinely failed to load, which in practice meant never: every dev
+    // machine and CI runner here has a working native build. That left the
+    // one code path someone's data actually depends on the moment they're
+    // compiling the native module themselves completely unexercised. This
+    // flag forces entry into the exact same catch block below (rather than
+    // duplicating the fallback logic elsewhere), so a test asserting
+    // TUTOR_FORCE_SQLJS=1 runs the real fallback code, not a stand-in for it.
+    if (process.env.TUTOR_FORCE_SQLJS === '1') {
+      throw new Error('TUTOR_FORCE_SQLJS=1 — forcing the sql.js fallback path for a test pass');
+    }
     // Preferred path: native SQLite, no in-memory export/rewrite needed.
     const { default: Database } = await import('better-sqlite3');
     db = new Database(DB_PATH);
@@ -218,11 +229,23 @@ function runMigrations() {
   }
 }
 
+// roadmap #4 — set while a sql.js transaction is open, so persist() below
+// can defer writing to disk until the transaction actually resolves. Found
+// by forcing the fallback path under test: db.export() (what persist() does)
+// silently ends an in-progress sql.js transaction, so the module-level
+// run() helper's per-statement persist() call — fired on every INSERT inside
+// withTransaction's loop, not just standalone writes — was closing out the
+// BEGIN before COMMIT ever ran. The COMMIT then failed with "no transaction
+// is active", and the catch block's own ROLLBACK failed the same way,
+// masking whatever error (if any) actually happened, and this data no longer
+// being written atomically in the case of a real error.
+let inTransaction = false;
+
 function persist() {
   // Only sql.js needs this: it keeps the whole DB in memory and has to
   // serialise and rewrite the entire file after every write. better-sqlite3
   // writes directly to disk per-statement, so this is a no-op for it.
-  if (backend !== 'sql.js' || !db) return;
+  if (backend !== 'sql.js' || !db || inTransaction) return;
   fs.writeFileSync(DB_PATH, Buffer.from(db.export()));
 }
 
@@ -238,12 +261,15 @@ function genId() {
 function withTransaction(fn) {
   const exec = sql => { backend === 'better-sqlite3' ? db.exec(sql) : db.run(sql); };
   exec('BEGIN');
+  inTransaction = true;
   try {
     const result = fn();
+    inTransaction = false;
     exec('COMMIT');
     persist();
     return result;
   } catch (err) {
+    inTransaction = false;
     exec('ROLLBACK');
     throw err;
   }
@@ -254,11 +280,19 @@ function query(sql, params = []) {
     return db.prepare(sql).all(...params);
   }
   const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) rows.push(stmt.getAsObject());
-  stmt.free();
-  return rows;
+  // roadmap #4 — bind() and free() must be in separate try/finally blocks,
+  // not left to the caller. A bad param type (e.g. an object where a string
+  // was expected) throws inside bind(), and a throw there must still reach
+  // free() below — see the comment on run()'s sql.js branch for what happens
+  // to every future export() when a prepared statement leaks instead.
+  try {
+    stmt.bind(params);
+    const rows = [];
+    while (stmt.step()) rows.push(stmt.getAsObject());
+    return rows;
+  } finally {
+    stmt.free();
+  }
 }
 
 function run(sql, params = []) {
@@ -266,7 +300,26 @@ function run(sql, params = []) {
     db.prepare(sql).run(...params);
     return; // already on disk — no export/rewrite pass needed
   }
-  db.run(sql, params);
+  // roadmap #4 — sql.js's own db.run(sql, params) convenience method
+  // prepares and binds in a single internal call, and its cleanup only
+  // covers step(): if bind() itself throws (e.g. a caller passes a non-
+  // string/number/buffer param), the exception fires before that method's
+  // own try/finally is even entered, so the prepared statement is never
+  // finalized. That leaked native handle corrupts every export() from then
+  // on: reads through this same connection stay correct, but the bytes
+  // persist() and exportDbSnapshot() write out silently stop reflecting new
+  // data — a totally silent, permanent loss of durability for the rest of
+  // the process's life, discovered by deliberately forcing this path under
+  // test (see test/sqlJsFallback.test.js). Preparing and freeing explicitly,
+  // in our own try/finally, is what query() already did above — this makes
+  // run() do the same instead of trusting db.run()'s internal cleanup.
+  const stmt = db.prepare(sql);
+  try {
+    stmt.bind(params);
+    stmt.step();
+  } finally {
+    stmt.free();
+  }
   persist();
 }
 
