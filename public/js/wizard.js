@@ -28,6 +28,7 @@ get('btn-create-topic').addEventListener('click', () => {
   get('paste-count').textContent = '';
   get('url-input').value = '';
   get('search-input').value = '';
+  resetSearchCacheMatch();
   get('wz-name-input').value = '';
   qa('#wz-source .mode-card').forEach(c => c.classList.remove('selected'));
 
@@ -93,6 +94,7 @@ qa('.src-tab').forEach(tab => tab.addEventListener('click', () => {
   tab.classList.add('active');
   materialType = tab.dataset.src;
   get(`src-${materialType}`).classList.add('active');
+  if (materialType !== 'search') resetSearchCacheMatch();
 }));
 
 // File input — extract immediately so the user can review/trim before continuing
@@ -163,6 +165,56 @@ function updateMaterialCount(textEl, countEl) {
 // Live counter on the paste textarea too — no more silent slicing, just visibility.
 get('paste-area').addEventListener('input', () => updateMaterialCount(get('paste-area'), get('paste-count')));
 
+// roadmap #4 (search caching) — as the user types a search query, check
+// search_cache for a close-enough past search (GET /api/search-cache/match,
+// same char+token similarity method as answer grading) and offer it before
+// the real request ever fires. The choice stays the user's: "Use saved
+// results" is the default selection when a match is found, but "Search
+// online" is one click away, and if no match exists this whole block just
+// stays hidden and nothing changes from before.
+let searchCacheCheckTimer = null;
+let searchCacheMatch = null; // { query, createdAt, similarity } | null
+
+function resetSearchCacheMatch() {
+  searchCacheMatch = null;
+  get('search-cache-match').classList.add('hidden');
+  get('pills-search-cache').querySelectorAll('.pill').forEach(p => {
+    const isCached = p.dataset.val === 'cached';
+    p.classList.toggle('active', isCached);
+    p.setAttribute('aria-pressed', String(isCached));
+  });
+}
+
+async function checkSearchCache(query) {
+  if (!query) { resetSearchCacheMatch(); return; }
+  try {
+    const { match } = await getJson(`/api/search-cache/match?q=${encodeURIComponent(query)}`);
+    if (!match) { resetSearchCacheMatch(); return; }
+    searchCacheMatch = match;
+    const when = new Date(match.createdAt).toLocaleDateString();
+    get('search-cache-match-note').textContent =
+      `Found saved results for a similar search — "${match.query}" (${when}). Use them, or search online for something fresher.`;
+    get('search-cache-match').classList.remove('hidden');
+  } catch {
+    // A failed cache-preview shouldn't block the wizard — just behave as if nothing was found.
+    resetSearchCacheMatch();
+  }
+}
+
+get('search-input').addEventListener('input', () => {
+  clearTimeout(searchCacheCheckTimer);
+  const query = get('search-input').value.trim();
+  searchCacheCheckTimer = setTimeout(() => checkSearchCache(query), 500);
+});
+
+get('pills-search-cache').querySelectorAll('.pill').forEach(p => {
+  p.addEventListener('click', () => {
+    get('pills-search-cache').querySelectorAll('.pill').forEach(x => { x.classList.remove('active'); x.setAttribute('aria-pressed', 'false'); });
+    p.classList.add('active');
+    p.setAttribute('aria-pressed', 'true');
+  });
+});
+
 // Step – Material → Name
 get('btn-wz-material-next').addEventListener('click', async () => {
   const nameIdx = currentWizardSteps().indexOf('wz-name');
@@ -177,6 +229,9 @@ get('btn-wz-material-next').addEventListener('click', async () => {
     if (!query) { alert('Enter something to search for, or switch to Paste/URL/File.'); return; }
     wizardData.material = query;
     wizardData.materialSource = 'search';
+    // Only meaningful when a cache match was actually offered — otherwise
+    // there's nothing to skip and the server just searches online as usual.
+    wizardData.forceOnline = !!(searchCacheMatch && get('pills-search-cache').querySelector('.pill.active')?.dataset.val === 'online');
   } else if (materialType === 'file') {
     if (!uploadedFileText) { alert('Choose a file to upload, or switch to Paste/URL.'); return; }
     wizardData.material = get('file-review-text').value.trim();
@@ -362,16 +417,20 @@ async function runWizardSession() {
     // the id this call returns (instead of re-fetching and grabbing
     // topics[0]) also fixes roadmap #11, where a stale or unrelated topic
     // could get picked up as "the one just created".
-    const savingLabel = wizardData.materialSource === 'search' ? 'Searching the web…' : 'Saving topic…';
+    const usingCachedSearch = wizardData.materialSource === 'search' && !wizardData.forceOnline && searchCacheMatch;
+    const savingLabel = wizardData.materialSource === 'search'
+      ? (usingCachedSearch ? 'Using saved results…' : 'Searching the web…')
+      : 'Saving topic…';
     const c1 = addCheck(savingLabel);
     msg.textContent = savingLabel;
 
     const scrapedServerSide = wizardData.materialSource === 'url' || wizardData.materialSource === 'search';
     const topic = await postWithRetry('/api/topics', {
-      name:      wizardData.topic,
-      content:   scrapedServerSide ? '' : wizardData.material,
-      source:    wizardData.materialSource || 'none',
-      sourceRef: scrapedServerSide ? wizardData.material : ''
+      name:        wizardData.topic,
+      content:     scrapedServerSide ? '' : wizardData.material,
+      source:      wizardData.materialSource || 'none',
+      sourceRef:   scrapedServerSide ? wizardData.material : '',
+      forceOnline: wizardData.materialSource === 'search' ? !!wizardData.forceOnline : undefined
     }, signal);
     if (!topic || !topic.id) throw new Error('Topic was not saved. Check your API key and try again.');
     doneCheck(c1);

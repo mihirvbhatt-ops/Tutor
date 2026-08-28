@@ -87,6 +87,13 @@
         <div class="src-panel" id="src-search">
           <input type="text" id="search-input" class="wz-input" placeholder="e.g. The French Revolution causes and timeline"/>
           <p class="hint">Finds and reads a handful of web pages on this topic. Needs a search provider key — add one under Settings → Search Provider.</p>
+          <div class="material-review hidden" id="search-cache-match">
+            <p class="material-review-note" id="search-cache-match-note"></p>
+            <div class="pill-row" id="pills-search-cache" role="group" aria-label="Use saved results or search online">
+              <button class="pill active" type="button" data-val="cached" aria-pressed="true">💾 Use saved results</button>
+              <button class="pill" type="button" data-val="online" aria-pressed="false">🌐 Search online</button>
+            </div>
+          </div>
         </div>
         <div class="src-panel" id="src-file">
           <label class="file-drop" id="file-drop">

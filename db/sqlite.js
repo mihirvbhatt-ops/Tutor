@@ -111,6 +111,22 @@ const SCHEMA_SQL = `
       FOREIGN KEY (topicId) REFERENCES topics(id)
     );
 
+    -- roadmap #4 (search caching) — one row per web search the wizard's
+    -- "Search" material source has actually run, so a later query similar
+    -- enough to a past one (tools/similarity.js's findSimilarQuery) can reuse
+    -- its content instead of re-querying the search provider and re-scraping
+    -- every result page. Independent of topics: outlives topic deletion/
+    -- renaming, since the point is to avoid repeating the network round-trip
+    -- regardless of what any given topic named itself.
+    CREATE TABLE IF NOT EXISTS search_cache (
+      id          TEXT PRIMARY KEY,
+      query       TEXT NOT NULL,
+      provider    TEXT NOT NULL,
+      content     TEXT NOT NULL,
+      resultCount INTEGER NOT NULL,
+      createdAt   TEXT NOT NULL
+    );
+
     -- roadmap #5 — indexes on the foreign-key columns actually hit by WHERE
     -- clauses (explanations/explanation_reads already have topicId as their
     -- PRIMARY KEY, and progress_state is always looked up by its composite
@@ -119,6 +135,7 @@ const SCHEMA_SQL = `
     CREATE INDEX IF NOT EXISTS idx_attempts_questionId ON attempts(questionId);
     CREATE INDEX IF NOT EXISTS idx_course_topics_courseId ON course_topics(courseId);
     CREATE INDEX IF NOT EXISTS idx_sessions_topicId ON sessions(topicId);
+    CREATE INDEX IF NOT EXISTS idx_search_cache_query ON search_cache(query);
 `;
 
 export async function initDb() {
@@ -367,6 +384,27 @@ export function deleteTopic(id) {
   run(`DELETE FROM explanation_reads WHERE topicId = ?`, [id]);
   run(`DELETE FROM topics WHERE id = ?`, [id]);
   return { ok: true };
+}
+
+// ── Search cache ──────────────────────────────────────────────────────────────
+
+export function saveSearchCache({ query, provider, content, resultCount }) {
+  const id = genId();
+  const createdAt = new Date().toISOString();
+  run(`INSERT INTO search_cache (id, query, provider, content, resultCount, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?)`, [id, query, provider, content, resultCount, createdAt]);
+  return { id, query, provider, resultCount, createdAt };
+}
+
+// Lightweight — omits content, since this is scanned in full for every
+// similarity check and content can be tens of thousands of characters.
+export function listSearchCacheQueries() {
+  return query(`SELECT id, query, createdAt FROM search_cache ORDER BY createdAt DESC`);
+}
+
+export function getSearchCache(id) {
+  const rows = query(`SELECT * FROM search_cache WHERE id = ?`, [id]);
+  return rows[0] || null;
 }
 
 // ── Explanations ──────────────────────────────────────────────────────────────

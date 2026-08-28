@@ -15,7 +15,7 @@ import {
   getInferenceRouting, saveInferenceRouting
 } from './db/config.js';
 import { probeOllama, ollamaComplete, capabilitiesOf, CALL_SITES } from './tools/inferenceProvider.js';
-import { localGrade } from './tools/similarity.js';
+import { localGrade, findSimilarQuery } from './tools/similarity.js';
 import { buildLocalQuestions } from './tools/localExtract.js';
 import { extractDocxText, extractPptxText } from './tools/fileExtract.js';
 import { normalizeExtractedText } from './tools/normalizeText.js';
@@ -34,6 +34,7 @@ import {
   saveProgress, getProgress, clearProgress,
   startSession, recordSessionAnswer, endSession, deleteSession, listSessions, getStatsSummary,
   saveExplanation, getExplanation,
+  saveSearchCache, listSearchCacheQueries, getSearchCache,
   exportAll, exportDbSnapshot
 } from './db/sqlite.js';
 
@@ -859,9 +860,10 @@ const SEARCH_RESULT_COUNT = 4;
 // (no model involved) since the agent no longer performs that step either.
 app.post('/api/topics', async (req, res) => {
   try {
-    const { name, source } = req.body;
+    const { name, source, forceOnline } = req.body;
     let { content = '', sourceRef = '' } = req.body;
     if (!name || !source) return res.status(400).json({ error: 'name and source are required' });
+    let cacheInfo = null;
 
     if (source === 'url' && !content) {
       const target = sourceRef || req.body.url;
@@ -877,34 +879,69 @@ app.post('/api/topics', async (req, res) => {
     // then reuses scrapeUrl (already SSRF-hardened) to pull each page's text
     // — same trust boundary as the 'url' source above, just multiple pages
     // instead of one the user picked themselves.
+    //
+    // roadmap #4 (search caching) — before spending a provider call and a
+    // batch of scrapes, check search_cache for a past query close enough
+    // (findSimilarQuery, same char+token method /api/evaluate's local
+    // grading pre-check already uses) that its stored content is still
+    // usable. The choice is the user's, not silently automatic: the wizard
+    // surfaces a cache match before this request ever fires (GET
+    // /api/search-cache/match) and only sets forceOnline when the user
+    // explicitly picked "search online" over the offered cached result.
     if (source === 'search' && !content) {
       const query = sourceRef || req.body.query;
       if (!query) return res.status(400).json({ error: 'sourceRef (search query) is required for source "search"' });
 
-      const provider = getSearchProvider();
-      const apiKey = getSearchApiKey();
-      if (!apiKey) return res.status(400).json({ error: 'No search API key configured — add one in Settings.', code: 'NO_SEARCH_KEY' });
+      if (!forceOnline) {
+        const match = findSimilarQuery(query, listSearchCacheQueries());
+        if (match) {
+          const cached = getSearchCache(match.id);
+          content = cached.content;
+          sourceRef = query;
+          cacheInfo = { cachedFrom: cached.query, cachedAt: cached.createdAt, similarity: match.similarity };
+        }
+      }
 
-      const found = await webSearch(query, provider, apiKey, SEARCH_RESULT_COUNT);
-      if (found.error) return res.status(400).json({ error: found.error });
-      if (!found.results.length) return res.status(400).json({ error: 'No search results for that query — try rephrasing it.' });
+      if (!cacheInfo) {
+        const provider = getSearchProvider();
+        const apiKey = getSearchApiKey();
+        if (!apiKey) return res.status(400).json({ error: 'No search API key configured — add one in Settings.', code: 'NO_SEARCH_KEY' });
 
-      const scraped = await Promise.all(found.results.map(r => scrapeUrl(r.url)));
-      const sections = found.results
-        .map((r, i) => ({ r, s: scraped[i] }))
-        .filter(({ s }) => !s.error)
-        .map(({ r, s }) => `# ${s.title || r.title}\nSource: ${s.url}\n\n${s.text}`);
-      if (!sections.length) return res.status(400).json({ error: 'Could not read any of the search results — try a different query.' });
+        const found = await webSearch(query, provider, apiKey, SEARCH_RESULT_COUNT);
+        if (found.error) return res.status(400).json({ error: found.error });
+        if (!found.results.length) return res.status(400).json({ error: 'No search results for that query — try rephrasing it.' });
 
-      content = normalizeExtractedText(sections.join('\n\n---\n\n'));
-      sourceRef = query;
+        const scraped = await Promise.all(found.results.map(r => scrapeUrl(r.url)));
+        const sections = found.results
+          .map((r, i) => ({ r, s: scraped[i] }))
+          .filter(({ s }) => !s.error)
+          .map(({ r, s }) => `# ${s.title || r.title}\nSource: ${s.url}\n\n${s.text}`);
+        if (!sections.length) return res.status(400).json({ error: 'Could not read any of the search results — try a different query.' });
+
+        content = normalizeExtractedText(sections.join('\n\n---\n\n'));
+        sourceRef = query;
+        saveSearchCache({ query, provider, content, resultCount: sections.length });
+      }
     }
 
-    res.status(201).json(saveTopic({ name, content, source, sourceRef }));
+    const topic = saveTopic({ name, content, source, sourceRef });
+    res.status(201).json(cacheInfo ? { ...topic, cached: true, ...cacheInfo } : topic);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: clientSafeMessage(err) });
   }
+});
+
+// roadmap #4 (search caching) — lets the wizard preview a cache match for
+// the query the user just typed, before they finish the rest of the wizard
+// and the real POST /api/topics call fires, so the "use cached / search
+// online" choice happens up front instead of after content is already
+// fetched one way or the other.
+app.get('/api/search-cache/match', (req, res) => {
+  const query = req.query.q;
+  if (!query || !query.trim()) return res.status(400).json({ error: 'q is required' });
+  const match = findSimilarQuery(query.trim(), listSearchCacheQueries());
+  res.json({ match: match ? { query: match.query, createdAt: match.createdAt, similarity: match.similarity } : null });
 });
 
 app.get('/api/topics',                   (req, res) => res.json(listTopics()));

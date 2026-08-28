@@ -26,7 +26,7 @@ process.env.TUTOR_CONFIG_PATH = TEST_CONFIG;
 process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || 'sk-test-not-a-real-key';
 
 const { app, initDb } = await import('../server.js');
-const { saveTopic, saveQuestions } = await import('../db/sqlite.js');
+const { saveTopic, saveQuestions, saveSearchCache } = await import('../db/sqlite.js');
 
 let server, base;
 
@@ -476,4 +476,81 @@ test('the export carries no API key — secrets live in config.json, not the dat
   const res = await get('/api/export');
   const raw = await res.text();
   assert.ok(!raw.includes(process.env.ANTHROPIC_API_KEY), 'API key leaked into the data export');
+});
+
+// ── #4 — search caching ──────────────────────────────────────────────────────
+// Seeds search_cache directly (bypassing webSearch/scrapeUrl, which need a
+// live provider key and network access this suite deliberately never has) so
+// the matching and cache-hit paths are exercised without a real search.
+
+test('GET /api/search-cache/match finds a similar past query and reports its similarity', async () => {
+  saveSearchCache({
+    query: 'French Revolution causes and timeline',
+    provider: 'tavily',
+    content: 'The French Revolution began in 1789...',
+    resultCount: 3
+  });
+
+  const res = await get('/api/search-cache/match?q=' + encodeURIComponent('causes and timeline of the French Revolution'));
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.ok(body.match, 'expected a match for a reworded version of the same query');
+  assert.equal(body.match.query, 'French Revolution causes and timeline');
+  assert.ok(body.match.similarity >= 0.82);
+});
+
+test('GET /api/search-cache/match returns null for a query unlike anything cached', async () => {
+  const res = await get('/api/search-cache/match?q=' + encodeURIComponent('completely unrelated quantum chromodynamics topic'));
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).match, null);
+});
+
+test('GET /api/search-cache/match without q returns 400', async () => {
+  const res = await get('/api/search-cache/match');
+  assert.equal(res.status, 400);
+});
+
+test('POST /api/topics with a matching cached query reuses stored content instead of searching', async () => {
+  saveSearchCache({
+    query: 'Mitochondria structure and function',
+    provider: 'tavily',
+    content: 'Mitochondria are the powerhouse of the cell...',
+    resultCount: 2
+  });
+
+  const res = await post('/api/topics', {
+    name: 'Cell Biology',
+    source: 'search',
+    sourceRef: 'structure and function of mitochondria'
+  });
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  assert.equal(body.cached, true);
+  assert.equal(body.cachedFrom, 'Mitochondria structure and function');
+  assert.ok(body.similarity >= 0.82);
+
+  const { getTopic } = await import('../db/sqlite.js');
+  assert.equal(getTopic(body.id).content, 'Mitochondria are the powerhouse of the cell...');
+});
+
+test('POST /api/topics with forceOnline skips a matching cache entry and hits the (unconfigured) search key path instead', async () => {
+  saveSearchCache({
+    query: 'Newtonian mechanics basics',
+    provider: 'tavily',
+    content: 'Newton\'s three laws of motion...',
+    resultCount: 2
+  });
+
+  const res = await post('/api/topics', {
+    name: 'Physics',
+    source: 'search',
+    sourceRef: 'Newtonian mechanics basics',
+    forceOnline: true
+  });
+  // No search key is configured in this test's throwaway config, so the live
+  // path 400s with NO_SEARCH_KEY — proving forceOnline actually bypassed the
+  // cache hit that would otherwise have returned 201 (as the previous test did
+  // for the same near-identical-query shape).
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).code, 'NO_SEARCH_KEY');
 });

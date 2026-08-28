@@ -82,3 +82,30 @@ export function localGrade(correctAnswer, userAnswer) {
 
   return { decision: 'ambiguous', similarity };
 }
+
+// Search-query matching reuses this same char+token similarity computation
+// against a lower bar than answer-grading's ACCEPT_THRESHOLD: a search query
+// only needs to be close enough that the material it already turned up is
+// still relevant (reordered words, a dropped filler word, singular/plural),
+// not near-exact wording — there's no model in the loop here to catch a
+// borderline case the way /api/evaluate's ambiguous band does, so this stays
+// conservative rather than trying to match paraphrases.
+const QUERY_MATCH_THRESHOLD = 0.82;
+
+// candidates: [{ id, query, ... }]. Returns the best-scoring candidate at or
+// above the threshold (plus its similarity), or null if none qualifies.
+export function findSimilarQuery(query, candidates) {
+  const normQ = normalize(query);
+  const tokensQ = tokenize(query);
+
+  let best = null;
+  for (const candidate of candidates) {
+    const charSim = levenshteinRatio(normQ, normalize(candidate.query));
+    const tokenSim = jaccard(tokensQ, tokenize(candidate.query));
+    const similarity = Math.max(charSim, tokenSim);
+    if (similarity >= QUERY_MATCH_THRESHOLD && (!best || similarity > best.similarity)) {
+      best = { ...candidate, similarity };
+    }
+  }
+  return best;
+}
