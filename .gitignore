@@ -22,6 +22,9 @@ db/config.json
 .DS_Store
 *.swp
 
+# Personal notes, not app code
+how-to-build-this-yourself.md
+
 # Claude Code local-only settings (machine-specific permission state) —
 # .claude/launch.json (dev-server config) is fine to share and stays tracked
 .claude/settings.local.json
