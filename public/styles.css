@@ -399,7 +399,7 @@ a.ghost-btn{display:inline-block;text-decoration:none;text-align:center}
 /* Explain */
 .explain-body{
   line-height:1.7;font-size:var(--fsize);
-  max-width:720px;
+  max-width:860px;margin:0 auto;
 }
 .explain-body h2{font-size:1.15rem;font-weight:800;margin:20px 0 8px;color:var(--accent)}
 .explain-body h3{font-size:1rem;font-weight:700;margin:16px 0 6px}
@@ -428,6 +428,13 @@ a.ghost-btn{display:inline-block;text-decoration:none;text-align:center}
   display:flex;flex-direction:column;align-items:center;
   gap:16px;padding:60px 20px;color:var(--ink2);
 }
+@media (min-width:700px){
+  .study-panel{padding:32px 40px}
+  .explain-body{font-size:calc(var(--fsize) + 2px)}
+  .explain-body h2{font-size:1.35rem}
+  .explain-body h3{font-size:1.15rem}
+  .followup-a{font-size:calc(var(--fsize) + 2px)}
+}
 /* roadmap #14 — raw text streamed in ahead of markdown rendering, so the
    user sees words arrive instead of a spinner for the whole generation. */
 .explain-stream{white-space:pre-wrap}
@@ -435,7 +442,7 @@ a.ghost-btn{display:inline-block;text-decoration:none;text-align:center}
 /* Follow-ups: turns the previously static explanation into a living thread —
    the user can ask for a simpler pass, an example, a different angle, or a
    free-form question without leaving the Explain panel or losing context. */
-#explain-followups{max-width:720px;margin-top:4px}
+#explain-followups{max-width:860px;margin:4px auto 0}
 .followup-qa{
   border-top:1px dashed var(--border);padding:16px 0;
 }
@@ -448,7 +455,7 @@ a.ghost-btn{display:inline-block;text-decoration:none;text-align:center}
 .followup-a.pending{color:var(--ink3);font-style:italic}
 
 .explain-followup-bar{
-  max-width:720px;margin-top:20px;padding-top:16px;
+  max-width:860px;margin:20px auto 0;padding-top:16px;
   border-top:1px solid var(--border);
   display:flex;flex-direction:column;gap:10px;
 }
