@@ -26,7 +26,7 @@ process.env.TUTOR_CONFIG_PATH = TEST_CONFIG;
 process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || 'sk-test-not-a-real-key';
 
 const { app, initDb } = await import('../server.js');
-const { saveTopic, saveQuestions, saveSearchCache } = await import('../db/sqlite.js');
+const { saveTopic, saveQuestions, saveSearchCache, closeDb } = await import('../db/sqlite.js');
 
 let server, base;
 
@@ -39,6 +39,7 @@ before(async () => {
 
 after(async () => {
   await new Promise(resolve => server.close(resolve));
+  closeDb();
   for (const suffix of ['', '-wal', '-shm']) fs.rmSync(TEST_DB + suffix, { force: true });
   fs.rmSync(TEST_CONFIG, { force: true });
 });

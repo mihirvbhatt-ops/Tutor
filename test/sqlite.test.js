@@ -15,7 +15,10 @@ process.env.TUTOR_DB_PATH = TEST_DB;
 const db = await import('../db/sqlite.js');
 
 before(async () => { await db.initDb(); });
-after(() => { for (const suffix of ['', '-wal', '-shm']) fs.rmSync(TEST_DB + suffix, { force: true }); });
+after(() => {
+  db.closeDb();
+  for (const suffix of ['', '-wal', '-shm']) fs.rmSync(TEST_DB + suffix, { force: true });
+});
 
 // Every test creates its own topic/course/session with a fresh generated id
 // and scopes its assertions to that id, so tests don't need shared-state

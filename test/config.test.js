@@ -37,7 +37,7 @@ test('saveApiKey persists to the file, and getApiKey/getApiKeySource pick it up'
   assert.equal(cfg.getApiKeySource(), 'file');
 });
 
-test('saveApiKey writes the file with owner-only (0600) permissions', () => {
+test('saveApiKey writes the file with owner-only (0600) permissions', { skip: process.platform === 'win32' && 'POSIX mode bits do not apply on Windows (NTFS ACLs instead)' }, () => {
   cfg.saveApiKey('sk-ant-file-key');
   const mode = fs.statSync(TEST_CONFIG).mode & 0o777;
   assert.equal(mode, 0o600);

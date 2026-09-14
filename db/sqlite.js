@@ -179,6 +179,17 @@ export async function initDb() {
   }
 }
 
+// Releases the native file handle. better-sqlite3 holds the DB file open for
+// the life of the process, which is fine for the app itself but means a test
+// suite's own cleanup (deleting its throwaway DB file right after the tests
+// finish) hits EBUSY on Windows, where an open file can't be unlinked — POSIX
+// allows it, Windows doesn't. sql.js never holds a file handle (it's an
+// in-memory DB periodically serialised to disk by persist()), so there's
+// nothing to release on that backend.
+export function closeDb() {
+  if (backend === 'better-sqlite3') db.close();
+}
+
 // roadmap #27 — migrations were three unconditional, order-dependent
 // statements re-run (and re-swallowed-on-failure) on every single startup,
 // with no record anywhere of which ones a given tutor.db had actually
