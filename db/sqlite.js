@@ -158,6 +158,7 @@ export async function initDb() {
     backend = 'better-sqlite3';
     db.exec(SCHEMA_SQL);
     runMigrations();
+    seedIfEmpty();
     console.log('[db] better-sqlite3 (native) — direct disk writes, no full-file rewrite per write.');
   } catch (err) {
     // No prebuilt binary for this platform/arch and nothing to compile with —
@@ -173,6 +174,7 @@ export async function initDb() {
     db.run(`PRAGMA journal_mode = WAL;`);
     db.run(SCHEMA_SQL);
     runMigrations();
+    seedIfEmpty();
     persist();
   }
 }
@@ -223,6 +225,33 @@ function getUserVersion() {
 function setUserVersion(v) {
   if (backend === 'better-sqlite3') db.pragma(`user_version = ${v}`);
   else db.run(`PRAGMA user_version = ${v}`);
+}
+
+// A brand-new install (no topics yet) gets exactly one topic — Trojan War —
+// so the library isn't empty on first launch but also isn't cluttered with
+// throwaway demo content. Test suites always override TUTOR_DB_PATH to a
+// throwaway file, so this intentionally never fires for them.
+function seedIfEmpty() {
+  if (process.env.TUTOR_DB_PATH) return;
+  const { c } = query(`SELECT COUNT(*) AS c FROM topics`)[0];
+  if (c > 0) return;
+
+  const seedPath = path.join(__dirname, 'seed-data.json');
+  if (!fs.existsSync(seedPath)) return;
+  const seed = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+
+  withTransaction(() => {
+    const topicId = genId();
+    run(`INSERT INTO topics (id, name, content, source, sourceRef, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      [topicId, seed.name, seed.content, 'seed', '', new Date().toISOString()]);
+    for (const q of seed.questions) {
+      run(`INSERT INTO questions (id, topicId, question, answer, type, options, origin)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [genId(), topicId, q.question, q.answer, q.type, q.options || null, q.origin || null]);
+    }
+  });
+  console.log(`[db] seeded default topic "${seed.name}" (${seed.questions.length} questions) — fresh install.`);
 }
 
 function runMigrations() {

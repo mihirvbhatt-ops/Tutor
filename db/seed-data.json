@@ -1,0 +1,302 @@
+{
+  "name": "Trojan War",
+  "content": "The Trojan War was a legendary conflict in Greek mythology, waged by the\nAchaeans (Greeks) against the city of Troy after Paris of Troy took Helen from\nher husband Menelaus, king of Sparta. The war is the central subject of\nHomer's Iliad, and its aftermath is covered in the Odyssey and other works of\nthe Epic Cycle (like the Aeneid, which follows the Trojan survivor Aeneas).\nTraditionally dated to the 12th or 13th century BC, the ten-year siege ended\nwhen the Greeks tricked the Trojans with the Trojan Horse, a hollow wooden\nhorse filled with soldiers, built by Epeius and gifted as a \"peace offering.\"\nKey figures include Achilles and Hector (whose duel is the climax of the\nIliad), Agamemnon (leader of the Greek forces), Odysseus (who devised the\nhorse), Priam (king of Troy), and Paris (whose \"Judgment of Paris\" \u2014 choosing\nAphrodite as fairest of the goddesses in exchange for Helen's love \u2014 set the\nwar in motion). The gods themselves take sides throughout: Hera, Athena, and\nPoseidon back the Greeks, while Aphrodite, Apollo, and Ares favor the\nTrojans. Archaeological excavations at Hisarlik in modern Turkey, begun by\nHeinrich Schliemann in the 1870s, uncovered multiple destruction layers,\nlending some historical plausibility to a real Bronze Age conflict behind the\nmyth, even though the gods, prophecies, and the horse itself are not\nconsidered literal history.\n\nKey figures:\nAchilles: the greatest Greek warrior, famed for his near invincibility except for his heel.\nHector: the greatest Trojan warrior and eldest son of King Priam.\nAgamemnon: the king of Mycenae and commander of the combined Greek forces.\nParis: the Trojan prince whose abduction of Helen triggered the war.\nHelen: the wife of Menelaus whose abduction by Paris sparked the conflict.\nTrojan Horse: the hollow wooden horse used by the Greeks to smuggle soldiers into Troy.",
+  "questions": [
+    {
+      "id": "mrtpjn2zb3hs",
+      "question": "According to legend, whose abduction by Paris triggered the Trojan War?",
+      "answer": "Helen of Sparta",
+      "type": "mcq",
+      "options": "[\"Helen of Sparta\",\"Cassandra of Troy\",\"Andromache\",\"Penelope\"]",
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn307s3m",
+      "question": "Which epic poem, attributed to Homer, tells the story of the Trojan War itself?",
+      "answer": "The Iliad",
+      "type": "mcq",
+      "options": "[\"The Iliad\",\"The Odyssey\",\"The Aeneid\",\"The Argonautica\"]",
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn30qy2h",
+      "question": "Who built the Trojan Horse?",
+      "answer": "Epeius",
+      "type": "mcq",
+      "options": "[\"Epeius\",\"Odysseus\",\"Daedalus\",\"Hephaestus\"]",
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn30fv4i",
+      "question": "Which Greek hero killed Hector, the greatest Trojan warrior?",
+      "answer": "Achilles",
+      "type": "mcq",
+      "options": "[\"Achilles\",\"Agamemnon\",\"Ajax\",\"Menelaus\"]",
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn300nrj",
+      "question": "Who was the king of Troy during the war?",
+      "answer": "Priam",
+      "type": "mcq",
+      "options": "[\"Priam\",\"Laomedon\",\"Aeneas\",\"Anchises\"]",
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn30tnlq",
+      "question": "Which goddess did Paris choose as \"fairest\" in the Judgment of Paris, setting the war in motion?",
+      "answer": "Aphrodite",
+      "type": "mcq",
+      "options": "[\"Aphrodite\",\"Hera\",\"Athena\",\"Artemis\"]",
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn30u55p",
+      "question": "Who commanded the combined Greek forces at Troy?",
+      "answer": "Agamemnon",
+      "type": "mcq",
+      "options": "[\"Agamemnon\",\"Menelaus\",\"Odysseus\",\"Nestor\"]",
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn30jwdx",
+      "question": "According to tradition, roughly how long did the siege of Troy last?",
+      "answer": "Ten years",
+      "type": "mcq",
+      "options": "[\"Ten years\",\"One year\",\"Three years\",\"Twenty years\"]",
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn30de2s",
+      "question": "Which archaeologist excavated the site at Hisarlik believed to be Troy?",
+      "answer": "Heinrich Schliemann",
+      "type": "mcq",
+      "options": "[\"Heinrich Schliemann\",\"Howard Carter\",\"Arthur Evans\",\"Flinders Petrie\"]",
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn30ut0m",
+      "question": "Which Trojan survivor's journey to found a new home in Italy is told in Virgil's Aeneid?",
+      "answer": "Aeneas",
+      "type": "mcq",
+      "options": "[\"Aeneas\",\"Paris\",\"Hector\",\"Deiphobus\"]",
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn306bmw",
+      "question": "What triggered the Trojan War?",
+      "answer": "Paris of Troy took Helen, wife of King Menelaus of Sparta, back to Troy \u2014 provoking a Greek expedition to retrieve her.",
+      "type": "flashcard",
+      "options": null,
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn306b2w",
+      "question": "What is the Trojan Horse?",
+      "answer": "A large hollow wooden horse the Greeks built and left outside Troy's gates as a fake \"peace offering,\" secretly filled with soldiers who opened the city gates at night.",
+      "type": "flashcard",
+      "options": null,
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn301may",
+      "question": "Who were Achilles and Hector?",
+      "answer": "The greatest warriors of the Greek and Trojan sides respectively; their duel, ending in Hector's death, is the climax of the Iliad.",
+      "type": "flashcard",
+      "options": null,
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn3045mk",
+      "question": "What is the \"Judgment of Paris\"?",
+      "answer": "A mythic contest where Paris chose Aphrodite as the fairest goddess over Hera and Athena, in exchange for the love of the world's most beautiful woman \u2014 Helen.",
+      "type": "flashcard",
+      "options": null,
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn303e0v",
+      "question": "What work covers the Trojan War itself, and what work covers its aftermath for Odysseus?",
+      "answer": "The Iliad covers the war (specifically a few weeks near its end); the Odyssey covers Odysseus's ten-year journey home afterward.",
+      "type": "flashcard",
+      "options": null,
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn30wr2x",
+      "question": "Which side did the gods Hera, Athena, and Poseidon support?",
+      "answer": "The Greeks (Achaeans).",
+      "type": "flashcard",
+      "options": null,
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn30nl7p",
+      "question": "Which side did the gods Aphrodite, Apollo, and Ares support?",
+      "answer": "The Trojans.",
+      "type": "flashcard",
+      "options": null,
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn30p1yh",
+      "question": "What happened to Aeneas after the fall of Troy?",
+      "answer": "He escaped the burning city and, per Virgil's Aeneid, eventually journeyed to Italy, where his descendants were said to found Rome.",
+      "type": "flashcard",
+      "options": null,
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn30bqdg",
+      "question": "Is there archaeological evidence for a real Trojan War?",
+      "answer": "Excavations at Hisarlik in Turkey (started by Heinrich Schliemann) found multiple destruction layers from the Bronze Age, suggesting a real conflict may lie behind the myth \u2014 though the gods and the horse are not treated as literal history.",
+      "type": "flashcard",
+      "options": null,
+      "origin": "ai"
+    },
+    {
+      "id": "mrtpjn30iluc",
+      "question": "Who was Menelaus?",
+      "answer": "King of Sparta and Helen's husband; his brother Agamemnon led the Greek expedition to Troy to bring her back.",
+      "type": "flashcard",
+      "options": null,
+      "origin": "ai"
+    },
+    {
+      "id": "mrv4krwhr9jt",
+      "question": "Achilles",
+      "answer": "the greatest Greek warrior, famed for his near invincibility except for his heel",
+      "type": "flashcard",
+      "options": null,
+      "origin": "local"
+    },
+    {
+      "id": "mrv4krwixl06",
+      "question": "Traditionally dated to the 12th or 13th century BC, the ten-year siege ended when the Greeks tricked the Trojans with the Trojan Horse, a hollow wooden horse filled with soldiers, built by Epeius and gifted as a \"peace offering.\" Key figures include _____ and Hector (whose duel is the climax of the Iliad), Agamemnon (leader of the Greek forces), Odysseus (who devised the horse), Priam (king of Troy), and Paris (whose \"Judgment of Paris\" \u2014 choosing Aphrodite as fairest of the goddesses in exchange for Helen's love \u2014 set the war in motion).",
+      "answer": "Achilles",
+      "type": "flashcard",
+      "options": null,
+      "origin": "local"
+    },
+    {
+      "id": "mrv4krwjdm0j",
+      "question": "Hector",
+      "answer": "the greatest Trojan warrior and eldest son of King Priam",
+      "type": "flashcard",
+      "options": null,
+      "origin": "local"
+    },
+    {
+      "id": "mrv4krwjiv08",
+      "question": "Traditionally dated to the 12th or 13th century BC, the ten-year siege ended when the Greeks tricked the Trojans with the Trojan Horse, a hollow wooden horse filled with soldiers, built by Epeius and gifted as a \"peace offering.\" Key figures include Achilles and _____ (whose duel is the climax of the Iliad), Agamemnon (leader of the Greek forces), Odysseus (who devised the horse), Priam (king of Troy), and Paris (whose \"Judgment of Paris\" \u2014 choosing Aphrodite as fairest of the goddesses in exchange for Helen's love \u2014 set the war in motion).",
+      "answer": "Hector",
+      "type": "flashcard",
+      "options": null,
+      "origin": "local"
+    },
+    {
+      "id": "mrv4krwjq9rj",
+      "question": "Agamemnon",
+      "answer": "the king of Mycenae and commander of the combined Greek forces",
+      "type": "flashcard",
+      "options": null,
+      "origin": "local"
+    },
+    {
+      "id": "mrv4krwj3ir2",
+      "question": "Traditionally dated to the 12th or 13th century BC, the ten-year siege ended when the Greeks tricked the Trojans with the Trojan Horse, a hollow wooden horse filled with soldiers, built by Epeius and gifted as a \"peace offering.\" Key figures include Achilles and Hector (whose duel is the climax of the Iliad), _____ (leader of the Greek forces), Odysseus (who devised the horse), Priam (king of Troy), and Paris (whose \"Judgment of Paris\" \u2014 choosing Aphrodite as fairest of the goddesses in exchange for Helen's love \u2014 set the war in motion).",
+      "answer": "Agamemnon",
+      "type": "flashcard",
+      "options": null,
+      "origin": "local"
+    },
+    {
+      "id": "mrv4krwjfwbr",
+      "question": "Paris",
+      "answer": "the Trojan prince whose abduction of Helen triggered the war",
+      "type": "flashcard",
+      "options": null,
+      "origin": "local"
+    },
+    {
+      "id": "mrv4krwj9dwn",
+      "question": "The Trojan War was a legendary conflict in Greek mythology, waged by the Achaeans (Greeks) against the city of Troy after _____ of Troy took Helen from her husband Menelaus, king of Sparta.",
+      "answer": "Paris",
+      "type": "flashcard",
+      "options": null,
+      "origin": "local"
+    },
+    {
+      "id": "mrv4krwjj8vx",
+      "question": "Helen",
+      "answer": "the wife of Menelaus whose abduction by Paris sparked the conflict",
+      "type": "flashcard",
+      "options": null,
+      "origin": "local"
+    },
+    {
+      "id": "mrv4krwj67lj",
+      "question": "The Trojan War was a legendary conflict in Greek mythology, waged by the Achaeans (Greeks) against the city of Troy after Paris of Troy took _____ from her husband Menelaus, king of Sparta.",
+      "answer": "Helen",
+      "type": "flashcard",
+      "options": null,
+      "origin": "local"
+    },
+    {
+      "id": "mrv4kupi5cbd",
+      "question": "Which of the following best defines \"Achilles\"?",
+      "answer": "the greatest Greek warrior, famed for his near invincibility except for his heel",
+      "type": "mcq",
+      "options": "[\"the greatest Trojan warrior and eldest son of King Priam\",\"the Trojan prince whose abduction of Helen triggered the war\",\"the greatest Greek warrior, famed for his near invincibility except for his heel\",\"the central subject of Homer's Iliad, and its aftermath is covered in the Odyssey and other works of the Epic Cycle (like the Aeneid, which follows the Trojan survivor Aeneas)\"]",
+      "origin": "local"
+    },
+    {
+      "id": "mrv4kupi0ceb",
+      "question": "Which of the following best defines \"Hector\"?",
+      "answer": "the greatest Trojan warrior and eldest son of King Priam",
+      "type": "mcq",
+      "options": "[\"the Trojan prince whose abduction of Helen triggered the war\",\"the hollow wooden horse used by the Greeks to smuggle soldiers into Troy\",\"the wife of Menelaus whose abduction by Paris sparked the conflict\",\"the greatest Trojan warrior and eldest son of King Priam\"]",
+      "origin": "local"
+    },
+    {
+      "id": "mrv4kupia1lk",
+      "question": "Which of the following best defines \"Agamemnon\"?",
+      "answer": "the king of Mycenae and commander of the combined Greek forces",
+      "type": "mcq",
+      "options": "[\"the king of Mycenae and commander of the combined Greek forces\",\"the Trojan prince whose abduction of Helen triggered the war\",\"the wife of Menelaus whose abduction by Paris sparked the conflict\",\"the hollow wooden horse used by the Greeks to smuggle soldiers into Troy\"]",
+      "origin": "local"
+    },
+    {
+      "id": "mrv4kupjz5o0",
+      "question": "Which of the following best defines \"Paris\"?",
+      "answer": "the Trojan prince whose abduction of Helen triggered the war",
+      "type": "mcq",
+      "options": "[\"the greatest Greek warrior, famed for his near invincibility except for his heel\",\"the wife of Menelaus whose abduction by Paris sparked the conflict\",\"the Trojan prince whose abduction of Helen triggered the war\",\"the king of Mycenae and commander of the combined Greek forces\"]",
+      "origin": "local"
+    },
+    {
+      "id": "mrv4kupj5aht",
+      "question": "Which of the following best defines \"Helen\"?",
+      "answer": "the wife of Menelaus whose abduction by Paris sparked the conflict",
+      "type": "mcq",
+      "options": "[\"the wife of Menelaus whose abduction by Paris sparked the conflict\",\"the central subject of Homer's Iliad, and its aftermath is covered in the Odyssey and other works of the Epic Cycle (like the Aeneid, which follows the Trojan survivor Aeneas)\",\"the greatest Trojan warrior and eldest son of King Priam\",\"the Trojan prince whose abduction of Helen triggered the war\"]",
+      "origin": "local"
+    },
+    {
+      "id": "mrv4kupjy074",
+      "question": "Which of the following best defines \"Trojan Horse\"?",
+      "answer": "the hollow wooden horse used by the Greeks to smuggle soldiers into Troy",
+      "type": "mcq",
+      "options": "[\"the Trojan prince whose abduction of Helen triggered the war\",\"the hollow wooden horse used by the Greeks to smuggle soldiers into Troy\",\"the greatest Trojan warrior and eldest son of King Priam\",\"the wife of Menelaus whose abduction by Paris sparked the conflict\"]",
+      "origin": "local"
+    },
+    {
+      "id": "mrv4kupj3rwa",
+      "question": "Which of the following best defines \"The war\"?",
+      "answer": "the central subject of Homer's Iliad, and its aftermath is covered in the Odyssey and other works of the Epic Cycle (like the Aeneid, which follows the Trojan survivor Aeneas)",
+      "type": "mcq",
+      "options": "[\"the central subject of Homer's Iliad, and its aftermath is covered in the Odyssey and other works of the Epic Cycle (like the Aeneid, which follows the Trojan survivor Aeneas)\",\"the wife of Menelaus whose abduction by Paris sparked the conflict\",\"the hollow wooden horse used by the Greeks to smuggle soldiers into Troy\",\"the greatest Greek warrior, famed for his near invincibility except for his heel\"]",
+      "origin": "local"
+    }
+  ]
+}
