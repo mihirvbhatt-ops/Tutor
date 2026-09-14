@@ -246,8 +246,60 @@ qa('.mode-picker-option').forEach(btn => btn.addEventListener('click', () => {
   hideModePicker();
   if (!topic) return;
   if (mode === 'stats') showTopicStats(topic);
+  else if (mode === 'edit') showTopicEdit(topic);
+  else if (mode === 'delete') deleteTopicFromLibrary(topic);
   else openTopicFromLibrary(topic, mode);
 }));
+
+// ── Edit / delete a topic ("book") from the library ─────────────────────────
+
+function hideTopicEdit() {
+  get('topic-edit-overlay').classList.add('hidden');
+}
+
+async function showTopicEdit(topic) {
+  const overlay = get('topic-edit-overlay');
+  const card    = get('topic-edit-card');
+  overlay.classList.remove('hidden');
+  card.innerHTML = '<div class="empty-state" style="padding:16px">Loading…</div>';
+
+  // listTopics() (what populates the library) omits content — fetch the
+  // full topic so the textarea isn't prefilled empty.
+  const full = await getJson(`/api/topics/${topic.id}`);
+
+  card.innerHTML = `
+    <div class="mode-picker-title">Edit "${esc(full.name)}"</div>
+    <input type="text" id="te-name" class="wz-input" value="${esc(full.name)}"/>
+    <textarea id="te-content" class="wz-textarea" rows="8">${esc(full.content || '')}</textarea>
+    <div class="te-actions">
+      <button class="te-btn te-primary" id="te-save">Save</button>
+      <button class="te-btn" id="te-cancel">Cancel</button>
+    </div>`;
+
+  card.querySelector('#te-cancel').addEventListener('click', hideTopicEdit);
+  card.querySelector('#te-save').addEventListener('click', async () => {
+    const name    = card.querySelector('#te-name').value.trim();
+    const content = card.querySelector('#te-content').value.trim();
+    if (!name) { card.querySelector('#te-name').focus(); return; }
+    await patchReq(`/api/topics/${topic.id}`, { name, content });
+    hideTopicEdit();
+    allTopics = [];
+    renderLibrary();
+  });
+}
+get('topic-edit-overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'topic-edit-overlay') hideTopicEdit(); // backdrop click
+});
+
+async function deleteTopicFromLibrary(topic) {
+  if (!confirm(`Delete "${topic.name}"? This removes its questions, attempts, and explanation — this can't be undone.`)) return;
+  await del(`/api/topics/${topic.id}`);
+  // Any study tab open on the now-deleted topic would otherwise keep
+  // pointing at content that no longer exists.
+  [...studyTabs].filter(t => t.topicId === topic.id).forEach(t => closeStudyTab(t.id));
+  allTopics = [];
+  renderLibrary();
+}
 
 // ── Topic stats popup ────────────────────────────────────────────────────────
 // Explanation-read % + overall question accuracy, expandable into a per-type

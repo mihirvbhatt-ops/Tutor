@@ -797,8 +797,22 @@
     <button class="mode-picker-option" data-mode="stats">
       <span class="mp-ico">📊</span><span>Stats</span>
     </button>
+    <button class="mode-picker-option" data-mode="edit">
+      <span class="mp-ico">✏️</span><span>Edit</span>
+    </button>
+    <button class="mode-picker-option mp-danger" data-mode="delete">
+      <span class="mp-ico">🗑️</span><span>Delete</span>
+    </button>
     <button class="mode-picker-cancel" id="mode-picker-cancel">Cancel</button>
   </div>
+</div>
+
+<!-- Topic edit popup: rename a topic and/or change its study content.
+     Opened via the "Edit" option above. Content is built entirely in JS
+     (see showTopicEdit() in library.js) so it can prefill the topic's
+     current name/content. -->
+<div id="topic-edit-overlay" class="mode-picker-overlay hidden">
+  <div class="mode-picker-card stats-popup-card" id="topic-edit-card"></div>
 </div>
 
 <!-- Topic stats popup: explanation-read % + overall/per-type question accuracy.
