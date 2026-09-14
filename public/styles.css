@@ -1428,12 +1428,38 @@ a.ghost-btn{display:inline-block;text-decoration:none;text-align:center}
   font-size: .95rem; color: #efe2c4; text-align: left;
 }
 .mode-picker-option:hover { border-color: #d8b258; color: #f2dfa4; background: rgba(255,255,255,.07); }
+.mode-picker-option.mp-danger { color: #e07a5f; border-color: #7a3325; }
+.mode-picker-option.mp-danger:hover { color: #f29a82; border-color: #a1462c; background: rgba(224,122,95,.08); }
 .mp-ico { font-size: 1.1rem }
 .mode-picker-cancel {
   margin-top: 4px; background: none; border: none;
   color: #c9b48a; font-size: .85rem; padding: 6px;
 }
 .mode-picker-cancel:hover { color: #efe2c4 }
+
+/* Topic edit form (#topic-edit-card) action row. Not .cd-btn: that class
+   pulls its colors from --lib-* custom properties scoped to #view-library,
+   and this card — like .mode-picker-card above — deliberately lives outside
+   it, so those variables would resolve to nothing there. Hardcoded to match
+   the same brass/parchment palette instead. */
+.te-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.te-btn {
+  flex: 1; min-width: 80px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid #7c5b1e;
+  color: #efe2c4;
+  padding: 8px 8px;
+  border-radius: 8px;
+  font-size: .82rem;
+  text-align: center;
+}
+.te-btn:hover { border-color: #d8b258; color: #f2dfa4; }
+.te-btn.te-primary {
+  background: linear-gradient(180deg,#f2dfa4,#7c5b1e);
+  color: #2a1608;
+  border-color: #7c5b1e;
+  font-weight: 700;
+}
 
 /* ── Course/topic/question stats popups ───────────────────────────────────── */
 /* Reuses .mode-picker-card as the popup shell; these are just its rows. */
