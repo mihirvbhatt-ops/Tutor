@@ -132,6 +132,7 @@ async function loadFlashPanel(topicId) {
   if (!flashQs.length) {
     get('flash-card-scene').classList.add('hidden');
     get('flash-summary-wrap').classList.add('hidden');
+    setGenChooserVisible('flashcard', true);
     renderPanelGenChooser(get('flash-gen-empty'), {
       glyph: '🗂️',
       title: 'No flashcards yet',
@@ -166,6 +167,7 @@ async function renderFlashCard() {
   // reached directly instead of loadFlashPanel(); re-run it to re-show the
   // chooser rather than mistaking an empty deck for a finished one below.
   if (!flashQs.length) { await loadFlashPanel(currentTopic.id); return; }
+  setGenChooserVisible('flashcard', false);
   if (flashIdx >= flashQs.length) {
     const topicId = currentTopic.id;
     const tab = getActiveTab();
@@ -226,6 +228,19 @@ async function recordAndAdvanceFlash(correct) {
 get('btn-flash-right').addEventListener('click', () => recordAndAdvanceFlash(true));
 get('btn-flash-wrong').addEventListener('click', () => recordAndAdvanceFlash(false));
 
+// The quiz and flashcard panels are shared by every study tab, so the
+// "No questions yet — generate" chooser has to be hidden explicitly whenever
+// a tab with questions renders into the panel. Only the first-load path used
+// to hide it: closing (or switching away from) an empty topic's tab and
+// landing on one whose deck was already loaded left the chooser drawn on top
+// of that topic's cards. The progress header belongs to a deck, so it's
+// hidden while the chooser is up (it showed the previous tab's "1 / 6").
+function setGenChooserVisible(mode, show) {
+  const prefix = mode === 'quiz' ? 'quiz' : 'flash';
+  get(`${prefix}-gen-empty`).classList.toggle('hidden', !show);
+  get(`panel-${mode}`).querySelector(`.${prefix}-top`).classList.toggle('hidden', show);
+}
+
 // Quiz
 async function loadQuizPanel(topicId) {
   const questions = await getJson(`/api/topics/${topicId}/questions`);
@@ -235,6 +250,8 @@ async function loadQuizPanel(topicId) {
   if (!quizQs.length) {
     get('quiz-card').classList.add('hidden');
     get('quiz-summary-wrap').classList.add('hidden');
+    freezeQuizClock();
+    setGenChooserVisible('quiz', true);
     renderPanelGenChooser(get('quiz-gen-empty'), {
       glyph: '❓',
       title: 'No quiz questions yet',
@@ -271,6 +288,7 @@ async function renderQuizQuestion() {
   // reached directly instead of loadQuizPanel(); re-run it to re-show the
   // chooser rather than mistaking an empty set for a finished one below.
   if (!quizQs.length) { await loadQuizPanel(currentTopic.id); return; }
+  setGenChooserVisible('quiz', false);
   const card = get('quiz-card');
   const wrap = get('quiz-summary-wrap');
   if (quizIdx >= quizQs.length) {
