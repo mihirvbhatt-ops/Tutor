@@ -40,6 +40,26 @@ function shapeText(shapeXml) {
   return [...shapeXml.matchAll(/<a:t[^>]*>([^<]*)<\/a:t>/g)].map(m => m[1]).join(' ').trim();
 }
 
+// A body shape whose bullets are indented under one another (term at level
+// 0, its definition as level-1+ sub-bullets) → one "Term: definition" line
+// per top-level bullet. Returns null when the shape has no such nesting, so
+// flat bodies keep the joined-text behavior.
+function shapeOutline(shapeXml) {
+  const paras = [...shapeXml.matchAll(/<a:p(?:\s[^>]*)?>[\s\S]*?<\/a:p>/g)]
+    .map(m => ({ lvl: Number(/<a:pPr\b[^>]*\blvl="(\d+)"/.exec(m[0])?.[1] ?? 0), text: shapeText(m[0]) }))
+    .filter(p => p.text);
+  if (!paras.length) return null;
+  const top = Math.min(...paras.map(p => p.lvl));
+  if (paras[0].lvl !== top || !paras.some(p => p.lvl > top)) return null;
+
+  const entries = [];
+  for (const p of paras) {
+    if (p.lvl === top) entries.push({ own: p.text, kids: [] });
+    else entries[entries.length - 1].kids.push(p.text);
+  }
+  return entries.map(e => (e.kids.length ? `${e.own.replace(/:$/, '')}: ${e.kids.join('; ')}` : e.own));
+}
+
 // One slide's raw XML in, one slide's worth of synthesized text out.
 export function synthesizePptxSlide(xml) {
   const shapes = [...xml.matchAll(/<p:sp>[\s\S]*?<\/p:sp>/g)].map(m => m[0]);
@@ -51,6 +71,7 @@ export function synthesizePptxSlide(xml) {
   // extra title shapes separate so they surface as their own line instead.
   const extraTitleTexts = [];
   const otherTexts = [];
+  const outlineLines = [];
 
   for (const sp of shapes) {
     const phType = /<p:ph\s+type="([^"]+)"/.exec(sp)?.[1];
@@ -60,7 +81,9 @@ export function synthesizePptxSlide(xml) {
       if (titleText === null) titleText = text;
       else extraTitleTexts.push(text);
     } else {
-      otherTexts.push(text);
+      const outline = shapeOutline(sp);
+      if (outline) outlineLines.push(...outline);
+      else otherTexts.push(text);
     }
   }
 
@@ -94,7 +117,7 @@ export function synthesizePptxSlide(xml) {
   } else {
     lines.push(...otherTexts);
   }
-  lines.push(...extraTitleTexts, ...tableLines, ...fallbackTableTexts);
+  lines.push(...outlineLines, ...extraTitleTexts, ...tableLines, ...fallbackTableTexts);
 
   if (!lines.length) {
     // Nothing recognized (image-only slide, freeform/unsupported shapes) —
@@ -120,13 +143,88 @@ export function extractPptxText(buffer) {
 
 // ── DOCX ──────────────────────────────────────────────────────────────────────
 
+// Top-level elements matching `tagRe` inside `html`, nesting-aware. A lazy
+// `<ul>[\s\S]*?</ul>` regex stops at the first *inner* `</ul>`, which on a
+// nested list (the usual "bold term, sub-bullets for its definition" study
+// guide) silently dropped every term after the first.
+function topLevelElements(html, tagRe) {
+  const out = [];
+  const openRe = new RegExp(`<(${tagRe})\\b[^>]*>`, 'g');
+  let open;
+  while ((open = openRe.exec(html))) {
+    const tag = open[1];
+    const tokenRe = new RegExp(`<(/?)${tag}\\b[^>]*>`, 'g');
+    tokenRe.lastIndex = open.index + open[0].length;
+    let depth = 1;
+    let tok;
+    while (depth && (tok = tokenRe.exec(html))) depth += tok[1] ? -1 : 1;
+    const end = tok ? tok.index + tok[0].length : html.length;
+    out.push({ tag, full: html.slice(open.index, end), inner: html.slice(open.index + open[0].length, tok ? tok.index : end) });
+    openRe.lastIndex = end;
+  }
+  return out;
+}
+
+// One <li>'s own text (nested lists removed) plus its sub-items, each sub-item
+// itself flattened with any deeper levels folded in. A sub-item that is a
+// bold-only label with sub-bullets of its own ("Ancient Egypt" → "Ba soul" →
+// its definition) is a nested term, not part of the parent's definition — it
+// comes back separately in `subTerms` so it gets its own line.
+function listItemParts(liInner) {
+  const nested = topLevelElements(liInner, 'ul|ol');
+  let own = liInner;
+  for (const n of nested) own = own.replace(n.full, ' ');
+  const children = [];
+  const subTerms = [];
+  for (const li of nested.flatMap(n => topLevelElements(n.inner, 'li'))) {
+    const parts = listItemParts(li.inner);
+    if (parts.children.length && parts.boldOnly) subTerms.push(...termLines(parts));
+    else children.push(flattenListItem(parts));
+  }
+  return {
+    own: stripTags(own),
+    // "Three parts:" (trailing colon) introduces its sub-bullets as part of
+    // the parent's definition — only a bare bold label names a new term.
+    boldOnly: /^\s*<(strong|b)>[\s\S]*?<\/\1>\s*$/.test(own) && !/:$/.test(stripTags(own)),
+    pair: boldLeadPair(own),
+    children: children.filter(Boolean),
+    subTerms
+  };
+}
+
+// A list item as "Term: child; child" plus any nested-term lines after it.
+function termLines(parts) {
+  return [flattenListItem(parts), ...parts.subTerms].filter(Boolean);
+}
+
+// "<strong>Term</strong>: definition" / "<strong>Term:</strong> definition" /
+// "<strong>Term</strong> – definition" — the other common way a study guide
+// marks a term inline. Needs an explicit separator so an ordinary sentence
+// that merely opens in bold ("<strong>Born</strong> in Phthia") isn't split.
+const LEAD_SEP = '[:–—-]';
+function boldLeadPair(innerHtml) {
+  const m = /^\s*<(strong|b)>([\s\S]*?)<\/\1>([\s\S]*)$/.exec(innerHtml);
+  if (!m) return null;
+  let term = stripTags(m[2]);
+  let rest = stripTags(m[3]);
+  if (new RegExp(`${LEAD_SEP}$`).test(term)) term = term.replace(new RegExp(`\\s*${LEAD_SEP}$`), '');
+  else if (new RegExp(`^${LEAD_SEP}`).test(rest)) rest = rest.replace(new RegExp(`^${LEAD_SEP}\\s*`), '');
+  else return null;
+  return term && rest ? `${term}: ${rest}` : null;
+}
+
+function flattenListItem({ own, children }) {
+  if (!children.length) return own;
+  return `${own.replace(/:$/, '')}: ${children.join('; ')}`;
+}
+
 // mammoth.convertToHtml() emits a flat sequence of sibling block elements
 // (h1-h6, p, table, ul/ol) in document order — walk that sequence, treating
 // each heading as a term and everything until the next heading as its
 // definition. A document with no headings at all degenerates to one line
 // per paragraph, matching the old extractRawText() behavior.
 export function synthesizeDocxHtml(html) {
-  const blocks = [...html.matchAll(/<(h[1-6]|p|table|ul|ol)[^>]*>[\s\S]*?<\/\1>/g)];
+  const blocks = topLevelElements(html, 'h[1-6]|p|table|ul|ol').map(b => [b.full, b.tag, b.inner]);
   const lines = [];
   let pendingTerm = null;
   let pendingBody = [];
@@ -144,16 +242,32 @@ export function synthesizeDocxHtml(html) {
   }
 
   for (const block of blocks) {
-    const [full, tag] = block;
+    const [full, tag, inner] = block;
     if (/^h[1-6]$/.test(tag)) {
       flush();
       pendingTerm = stripTags(full);
     } else if (tag === 'p') {
-      const text = stripTags(full);
-      if (text) pendingBody.push(text);
+      const pair = boldLeadPair(inner);
+      if (pair) {
+        flush();
+        lines.push(pair);
+      } else {
+        const text = stripTags(full);
+        if (text) pendingBody.push(text);
+      }
     } else if (tag === 'ul' || tag === 'ol') {
-      const items = [...full.matchAll(/<li[^>]*>[\s\S]*?<\/li>/g)].map(m => stripTags(m[0])).filter(Boolean);
-      pendingBody.push(...items);
+      const items = topLevelElements(inner, 'li').map(li => listItemParts(li.inner));
+      if (items.some(it => it.children.length || it.subTerms.length || it.pair)) {
+        // Bullets with sub-bullets, or bold-term bullets, = a glossary in
+        // list form: each term gets its own "Term: definition" line.
+        flush();
+        for (const it of items) {
+          if (it.pair && !it.children.length) lines.push(it.pair, ...it.subTerms);
+          else lines.push(...termLines(it));
+        }
+      } else {
+        pendingBody.push(...items.map(it => it.own).filter(Boolean));
+      }
     } else if (tag === 'table') {
       // A table mid-document must not jump ahead of a still-pending
       // heading/paragraph pair — commit whatever's pending first so lines

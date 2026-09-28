@@ -181,6 +181,24 @@ test('extractTerms finds other past-tense copula variants (were/referred to/mean
   assert.match(term.definition, /independent political units/);
 });
 
+test('extractTerms accepts term names with dashes, slashes, accents, parentheses and footnote markers', () => {
+  const content = [
+    'Mind–body dualism: mind or soul and body are two separate entities.',
+    'Agency / agency detection: the tendency to see intentional agents behind events.',
+    'Psychē (soul): the form or organizing principle of a living thing.',
+    'Animism †: belief that spirits inhabit animals, plants and objects.'
+  ].join('\n');
+  const terms = extractTerms(content).map(t => t.term);
+  assert.deepEqual(terms, ['Mind–body dualism', 'Agency / agency detection', 'Psychē (soul)', 'Animism']);
+});
+
+test('extractCloze blanks out a term that starts or ends with a non-ASCII or non-word character', () => {
+  const content = 'Psychē (soul): the form or organizing principle of a living thing.\nAristotle tied the Psychē (soul) to the body.';
+  const clozes = extractCloze(content, extractTerms(content));
+  assert.equal(clozes.length, 1);
+  assert.equal(clozes[0].clozeText, 'Aristotle tied the _____ to the body.');
+});
+
 test('extractCloze does not build a cloze from a piece of the term\'s own definition line', () => {
   // The internal "c." and the second colon make splitSentences cut each line
   // into pieces that never equal the full line.
