@@ -47,7 +47,7 @@ before(() => {
   const trailer = `
 window.__T = {
   esc, markdownToHtml, formatClock, quizClockElapsedMs, computeSpineStyle,
-  statBarRow, fmtCount, wizardGenBody, countsFromInputs
+  statBarRow, fmtCount, wizardGenBody, countsFromInputs, loadExplainPanel, addExplainModeIfAvailable
 };`;
   win.eval(appJs + '\n' + trailer);
   T = win.__T;
@@ -219,4 +219,83 @@ test('starting a new topic clears the file input so re-picking the same file fir
   win.document.getElementById('btn-create-topic').click();
   delete input.value;
   assert.equal(assigned, '');
+});
+
+// ── Explain panel: saved explanations never depend on the AI ────────────────
+
+// Routes fetch() by URL; records every URL requested so a test can assert
+// the agent (/api/chat) was never called.
+function stubFetch(routes) {
+  const calls = [];
+  win.fetch = async url => {
+    calls.push(String(url));
+    const hit = Object.entries(routes).find(([prefix]) => String(url) === prefix);
+    const [status, body] = hit ? hit[1] : [500, { error: 'unexpected' }];
+    return { ok: status < 400, status, json: async () => body }; // jsdom has no Response
+  };
+  return calls;
+}
+
+test('loadExplainPanel shows a saved explanation without calling the AI', async () => {
+  const calls = stubFetch({ '/api/topics/t1/explanation': [200, { main: '<h2>Overview</h2><p>Saved.</p>', followups: [] }] });
+  await T.loadExplainPanel('t1');
+  const body = win.document.getElementById('explain-body');
+  assert.equal(body.querySelector('h2').textContent, 'Overview');
+  assert.ok(!calls.some(u => u.includes('/api/chat')));
+});
+
+test('loadExplainPanel with nothing saved and no API key shows a notice and the saved material instead of failing', async () => {
+  const calls = stubFetch({
+    '/api/topics/t2/explanation': [200, null],
+    '/api/settings/api-key': [200, { hasKey: false }],
+    '/api/topics/t2': [200, { id: 't2', content: 'Photosynthesis: light to chemical energy.\n<b>not html</b>' }]
+  });
+  await T.loadExplainPanel('t2');
+  const body = win.document.getElementById('explain-body');
+  assert.match(body.textContent, /No explanation saved for this topic yet/);
+  assert.match(body.textContent, /Photosynthesis: light to chemical energy\./);
+  assert.equal(body.querySelector('b'), null, 'saved material is escaped, not rendered as HTML');
+  assert.ok(win.document.getElementById('btn-explain-add-key'));
+  assert.ok(!calls.some(u => u.includes('/api/chat')), 'no doomed agent request');
+});
+
+test('loadExplainPanel reports a failed read of the saved explanation instead of regenerating over it', async () => {
+  const calls = stubFetch({ '/api/topics/t3/explanation': [500, { error: 'db busy' }] });
+  await T.loadExplainPanel('t3');
+  const body = win.document.getElementById('explain-body');
+  assert.match(body.textContent, /Couldn’t load the saved explanation/);
+  assert.ok(win.document.getElementById('btn-explain-retry'));
+  assert.ok(!calls.some(u => u.includes('/api/chat')));
+});
+
+// ── Explain section for topics created without "Explain" ────────────────────
+
+test('addExplainModeIfAvailable adds Explain when the topic has saved material, even though it was not picked', async () => {
+  stubFetch({
+    '/api/topics/t4/explanation': [200, null],
+    '/api/topics/t4': [200, { id: 't4', content: 'Hunter-gatherer: society that forages.' }]
+  });
+  const tab = { id: 'x1', topicId: 't4', modes: ['flashcard', 'quiz'] };
+  await T.addExplainModeIfAvailable(tab);
+  assert.deepEqual([...tab.modes], ['explain', 'flashcard', 'quiz']);
+});
+
+test('addExplainModeIfAvailable adds Explain when a saved explanation exists', async () => {
+  stubFetch({
+    '/api/topics/t5/explanation': [200, { main: '<h2>Overview</h2>', followups: [] }],
+    '/api/topics/t5': [200, { id: 't5', content: '' }]
+  });
+  const tab = { id: 'x2', topicId: 't5', modes: ['quiz'] };
+  await T.addExplainModeIfAvailable(tab);
+  assert.deepEqual([...tab.modes], ['explain', 'quiz']);
+});
+
+test('addExplainModeIfAvailable leaves the sections alone when there is nothing to explain from', async () => {
+  stubFetch({
+    '/api/topics/t6/explanation': [200, null],
+    '/api/topics/t6': [200, { id: 't6', content: '   ' }]
+  });
+  const tab = { id: 'x3', topicId: 't6', modes: ['quiz'] };
+  await T.addExplainModeIfAvailable(tab);
+  assert.deepEqual([...tab.modes], ['quiz']);
 });

@@ -403,6 +403,27 @@ function openStudyTab(topic, session, startMode) {
   studyTabs.push(tab);
   showView('study');
   switchToTab(tab.id);
+  addExplainModeIfAvailable(tab);
+}
+
+// A tab's sections come from the modes picked in the wizard, so a topic
+// created without "Explain" never showed one — even when it has something to
+// explain from: a saved explanation, or its own saved material (an uploaded
+// study guide). Add the Explain section in that case; the panel itself shows
+// the saved explanation, or the material when there's no AI to write one.
+async function addExplainModeIfAvailable(tab) {
+  if (!tab.topicId || tab.modes.includes('explain')) return;
+  let available;
+  try {
+    const [expl, topic] = await Promise.all([
+      getJson(`/api/topics/${tab.topicId}/explanation`),
+      getJson(`/api/topics/${tab.topicId}`)
+    ]);
+    available = !!expl || !!topic?.content?.trim();
+  } catch { return; }
+  if (!available || tab.modes.includes('explain')) return;
+  tab.modes = ['explain', ...tab.modes];
+  if (tab.id === activeTabId) renderModeBar(tab);
 }
 
 // Opens a blank tab with no topic assigned — a placeholder the user can fill
@@ -433,6 +454,7 @@ function fillEmptyTabOrOpenNew(topic, session, startMode) {
     target.mode = startMode || 'explain';
     showView('study');
     switchToTab(target.id);
+    addExplainModeIfAvailable(target);
     return;
   }
   openStudyTab(topic, sess, startMode);

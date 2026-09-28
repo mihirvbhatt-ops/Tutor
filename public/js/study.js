@@ -8,11 +8,73 @@ qa('.mode-tab').forEach(tab => tab.addEventListener('click', () => {
 }));
 
 // Explain
+//
+// A saved explanation is always shown as-is — no AI involved. Only when
+// nothing is saved does the panel try to write one, and only if an API key
+// is configured: without one the agent call can only fail, which used to
+// leave the panel on a bare "Could not load explanation" with no way to
+// read anything. A failed *read* of the saved explanation is reported as
+// such rather than treated as "nothing saved", so a transient error can't
+// kick off a regeneration that overwrites a good explanation.
 async function loadExplainPanel(topicId) {
   const body = get('explain-body');
-  const cached = await loadExpl(topicId);
+  let cached;
+  try {
+    cached = await getJson(`/api/topics/${topicId}/explanation`);
+  } catch {
+    renderExplainNotice(body, {
+      title: 'Couldn’t load the saved explanation.',
+      hint: 'Check that the tutor app is still running, then try again.',
+      retry: () => loadExplainPanel(topicId)
+    });
+    return;
+  }
   if (cached) { body.innerHTML = cached.main; renderFollowups(cached.followups); trackExplainScroll(); return; }
 
+  let keyStatus = null;
+  try { keyStatus = await getJson('/api/settings/api-key'); } catch { /* unknown — just try */ }
+  if (keyStatus && !keyStatus.hasKey) { await renderNoKeyExplain(body, topicId); return; }
+
+  generateExplanation(body, topicId);
+}
+
+// Notice in the explain panel with an optional "Try again" action.
+function renderExplainNotice(body, { title, hint, retry }) {
+  renderFollowups([]);
+  body.innerHTML = `
+    <div class="explain-notice">
+      <p class="empty-title">${esc(title)}</p>
+      ${hint ? `<p class="hint">${esc(hint)}</p>` : ''}
+      ${retry ? '<button class="ghost-btn" id="btn-explain-retry">Try again</button>' : ''}
+    </div>`;
+  if (retry) get('btn-explain-retry').addEventListener('click', retry);
+}
+
+// No saved explanation and no API key: say so, point at Settings, and show
+// the topic's own saved material so there's still something to study from.
+async function renderNoKeyExplain(body, topicId) {
+  renderFollowups([]);
+  get('explain-followup-bar')?.classList.add('hidden'); // follow-ups need the AI too
+  let content = '';
+  try { content = (await getJson(`/api/topics/${topicId}`))?.content || ''; } catch { /* notice alone is fine */ }
+  const material = content.trim()
+    ? `<h2>Your saved material</h2>${content.trim().split(/\n+/).map(line => `<p>${esc(line)}</p>`).join('')}`
+    : '';
+  body.innerHTML = `
+    <div class="explain-notice">
+      <p class="empty-title">No explanation saved for this topic yet</p>
+      <p class="hint">Explanations are written by the AI, which needs an API key. Add one in Settings to generate an explanation — flashcards and quizzes made without AI still work.</p>
+      <button class="ghost-btn" id="btn-explain-add-key">Add API Key</button>
+    </div>
+    ${material}`;
+  get('btn-explain-add-key').addEventListener('click', () => {
+    showView('settings');
+    get('s-apikey-input')?.focus({ preventScroll: true });
+  });
+  trackExplainScroll();
+}
+
+function generateExplanation(body, topicId) {
   body.innerHTML = `<div class="explain-loading"><div class="spinner"></div><p>Generating explanation…</p></div>`;
   renderFollowups([]);
   let streaming = false;
@@ -29,7 +91,11 @@ async function loadExplainPanel(topicId) {
       body.innerHTML = html;
       trackExplainScroll();
     })
-    .catch(() => { body.innerHTML = '<p style="color:var(--ink2)">Could not load explanation — try again.</p>'; });
+    .catch(err => renderExplainNotice(body, {
+      title: 'Couldn’t generate an explanation.',
+      hint: err?.message || 'The AI request failed.',
+      retry: () => generateExplanation(body, topicId)
+    }));
 }
 
 // ── Explanation read tracking ────────────────────────────────────────────────
@@ -132,6 +198,7 @@ async function loadFlashPanel(topicId) {
   if (!flashQs.length) {
     get('flash-card-scene').classList.add('hidden');
     get('flash-summary-wrap').classList.add('hidden');
+    setGenChooserVisible('flashcard', true);
     renderPanelGenChooser(get('flash-gen-empty'), {
       glyph: '🗂️',
       title: 'No flashcards yet',
@@ -166,6 +233,7 @@ async function renderFlashCard() {
   // reached directly instead of loadFlashPanel(); re-run it to re-show the
   // chooser rather than mistaking an empty deck for a finished one below.
   if (!flashQs.length) { await loadFlashPanel(currentTopic.id); return; }
+  setGenChooserVisible('flashcard', false);
   if (flashIdx >= flashQs.length) {
     const topicId = currentTopic.id;
     const tab = getActiveTab();
@@ -226,6 +294,19 @@ async function recordAndAdvanceFlash(correct) {
 get('btn-flash-right').addEventListener('click', () => recordAndAdvanceFlash(true));
 get('btn-flash-wrong').addEventListener('click', () => recordAndAdvanceFlash(false));
 
+// The quiz and flashcard panels are shared by every study tab, so the
+// "No questions yet — generate" chooser has to be hidden explicitly whenever
+// a tab with questions renders into the panel. Only the first-load path used
+// to hide it: closing (or switching away from) an empty topic's tab and
+// landing on one whose deck was already loaded left the chooser drawn on top
+// of that topic's cards. The progress header belongs to a deck, so it's
+// hidden while the chooser is up (it showed the previous tab's "1 / 6").
+function setGenChooserVisible(mode, show) {
+  const prefix = mode === 'quiz' ? 'quiz' : 'flash';
+  get(`${prefix}-gen-empty`).classList.toggle('hidden', !show);
+  get(`panel-${mode}`).querySelector(`.${prefix}-top`).classList.toggle('hidden', show);
+}
+
 // Quiz
 async function loadQuizPanel(topicId) {
   const questions = await getJson(`/api/topics/${topicId}/questions`);
@@ -235,6 +316,8 @@ async function loadQuizPanel(topicId) {
   if (!quizQs.length) {
     get('quiz-card').classList.add('hidden');
     get('quiz-summary-wrap').classList.add('hidden');
+    freezeQuizClock();
+    setGenChooserVisible('quiz', true);
     renderPanelGenChooser(get('quiz-gen-empty'), {
       glyph: '❓',
       title: 'No quiz questions yet',
@@ -271,6 +354,7 @@ async function renderQuizQuestion() {
   // reached directly instead of loadQuizPanel(); re-run it to re-show the
   // chooser rather than mistaking an empty set for a finished one below.
   if (!quizQs.length) { await loadQuizPanel(currentTopic.id); return; }
+  setGenChooserVisible('quiz', false);
   const card = get('quiz-card');
   const wrap = get('quiz-summary-wrap');
   if (quizIdx >= quizQs.length) {
