@@ -44,7 +44,7 @@ test('schema and migrations applied: all ten tables exist and schemaVersion refl
   }
   // Highest migration version in db/sqlite.js's MIGRATIONS list at time of
   // writing; bump this alongside a new migration, same as any other schema test.
-  assert.equal(schemaVersion, 3);
+  assert.equal(schemaVersion, 4);
 });
 
 test('CRUD round-trips correctly on sql.js: topic, questions, attempts, progress', () => {

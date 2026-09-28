@@ -47,7 +47,8 @@ before(() => {
   const trailer = `
 window.__T = {
   esc, markdownToHtml, formatClock, quizClockElapsedMs, computeSpineStyle,
-  statBarRow, fmtCount, wizardGenBody, countsFromInputs, loadExplainPanel, addExplainModeIfAvailable
+  statBarRow, fmtCount, wizardGenBody, countsFromInputs, loadExplainPanel, addExplainModeIfAvailable,
+  bookStyle, createBookElement
 };`;
   win.eval(appJs + '\n' + trailer);
   T = win.__T;
@@ -298,4 +299,54 @@ test('addExplainModeIfAvailable leaves the sections alone when there is nothing 
   const tab = { id: 'x3', topicId: 't6', modes: ['quiz'] };
   await T.addExplainModeIfAvailable(tab);
   assert.deepEqual([...tab.modes], ['quiz']);
+});
+
+// ── Custom book covers ──────────────────────────────────────────────────────
+
+test('bookStyle with no cover renders exactly as before (automatic look unchanged)', () => {
+  assert.deepEqual({ ...T.bookStyle('Photosynthesis', null) }, { ...T.bookStyle('Photosynthesis') });
+});
+
+test('bookStyle applies a custom length, width, spine colour, band colour, band size and type', () => {
+  const s = T.bookStyle('Photosynthesis', { length: 'tall', width: 'wide', color: '#112233', bandColor: '#aa0000', bandSize: 'thick', bandType: 'two-end' });
+  assert.equal(s.width, 36);
+  assert.equal(s.height, 150);
+  assert.match(s.spineBase, /#112233/);
+  assert.match(s.spineBase, /#aa0000/);
+  assert.equal(s.finish, 'finish-matte');
+  assert.match(s.titleColor, /#aa0000/);
+  // "thick" two-end bands are wider than the automatic ones
+  const thin = T.bookStyle('Photosynthesis', { bandSize: 'thin', bandType: 'two-end', bandColor: '#aa0000' });
+  assert.ok(s.titleClear < thin.titleClear);
+});
+
+test('bookStyle with bandType "none" draws no band at all', () => {
+  const s = T.bookStyle('Photosynthesis', { bandType: 'none', color: '#112233' });
+  assert.equal(s.spineBase, '#112233');
+});
+
+test('createBookElement builds the same spine the library shelf shows', () => {
+  const { book, style } = T.createBookElement('Trojan War', { width: 'thin' });
+  assert.equal(book.style.width, `${style.width}px`);
+  assert.equal(book.querySelector('.book-title').textContent, 'TrojanWar');
+});
+
+test('bookStyle sets length and width independently of each other', () => {
+  const auto = T.bookStyle('Photosynthesis');
+  const wideOnly = T.bookStyle('Photosynthesis', { width: 'wide' });
+  assert.equal(wideOnly.width, 36);
+  assert.equal(wideOnly.height, auto.height, 'width alone leaves the automatic length');
+  const shortOnly = T.bookStyle('Photosynthesis', { length: 'short' });
+  assert.equal(shortOnly.width, auto.width, 'length alone leaves the automatic width');
+  const tall = T.bookStyle('Photosynthesis', { length: 'tall' });
+  assert.ok(tall.height > shortOnly.height);
+});
+
+test('a chosen length is exact even for a long title, which shrinks its font to fit instead', () => {
+  const name = 'Afterlife Beliefs Study Guide Definitions';
+  const short = T.bookStyle(name, { length: 'short' });
+  const medium = T.bookStyle(name, { length: 'medium' });
+  const tall = T.bookStyle(name, { length: 'tall' });
+  assert.deepEqual([short.height, medium.height, tall.height], [84, 116, 150]);
+  assert.ok(short.fontSize < tall.fontSize, 'the shorter book uses a smaller title font');
 });

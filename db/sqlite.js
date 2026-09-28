@@ -224,6 +224,13 @@ const MIGRATIONS = [
     // rather than guessing.
     description: "questions: add origin column ('ai' | 'local' | 'manual' | NULL)",
     run: () => run(`ALTER TABLE questions ADD COLUMN origin TEXT DEFAULT NULL`)
+  },
+  {
+    version: 4,
+    // Library book covers the user customised (see normalizeCover). NULL —
+    // every existing row — keeps the automatic, name-derived cover.
+    description: 'topics: add cover column (JSON: length, width, color, bandColor, bandSize, bandType)',
+    run: () => run(`ALTER TABLE topics ADD COLUMN cover TEXT DEFAULT NULL`)
   }
 ];
 
@@ -392,24 +399,56 @@ export function saveTopic({ name, content, source, sourceRef = '' }) {
 
 export function listTopics() {
   return query(`
-    SELECT t.id, t.name, t.source, t.sourceRef, t.createdAt,
+    SELECT t.id, t.name, t.source, t.sourceRef, t.createdAt, t.cover,
            (SELECT MAX(startedAt) FROM sessions WHERE topicId = t.id) AS lastStudiedAt
     FROM topics t
     ORDER BY t.createdAt DESC
-  `).map(t => ({ ...t, ...topicStats(t.id) }));
+  `).map(t => ({ ...t, cover: parseCover(t.cover), ...topicStats(t.id) }));
 }
 
 export function getTopic(id) {
   const rows = query(`SELECT * FROM topics WHERE id = ?`, [id]);
-  return rows[0] || null;
+  return rows[0] ? { ...rows[0], cover: parseCover(rows[0].cover) } : null;
 }
 
-export function updateTopic(id, { name, content } = {}) {
+// ── Book cover customisation ──────────────────────────────────────────────────
+// Every field is optional; a missing one stays automatic (derived from the
+// topic name in public/js/library.js). Anything unrecognised is dropped
+// rather than stored, so a bad value can't break the library's rendering.
+// length = how tall the book stands on the shelf; width = spine thickness.
+export const COVER_LENGTHS    = ['short', 'medium', 'tall'];
+export const COVER_WIDTHS     = ['thin', 'medium', 'wide'];
+export const COVER_BAND_SIZES = ['thin', 'medium', 'thick'];
+export const COVER_BAND_TYPES = ['asymmetric', 'two-end', 'double', 'none'];
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+export function normalizeCover(cover) {
+  if (!cover || typeof cover !== 'object' || Array.isArray(cover)) return null;
+  const out = {};
+  if (COVER_LENGTHS.includes(cover.length)) out.length = cover.length;
+  if (COVER_WIDTHS.includes(cover.width)) out.width = cover.width;
+  if (typeof cover.color === 'string' && HEX_COLOR.test(cover.color)) out.color = cover.color.toLowerCase();
+  if (typeof cover.bandColor === 'string' && HEX_COLOR.test(cover.bandColor)) out.bandColor = cover.bandColor.toLowerCase();
+  if (COVER_BAND_SIZES.includes(cover.bandSize)) out.bandSize = cover.bandSize;
+  if (COVER_BAND_TYPES.includes(cover.bandType)) out.bandType = cover.bandType;
+  return Object.keys(out).length ? out : null;
+}
+
+function parseCover(raw) {
+  if (!raw) return null;
+  try { return normalizeCover(JSON.parse(raw)); } catch { return null; }
+}
+
+// `cover`: undefined leaves it as-is; null (or an object with nothing valid
+// in it) resets the book to its automatic cover.
+export function updateTopic(id, { name, content, cover } = {}) {
   const topic = getTopic(id);
   if (!topic) return null;
   const newName    = name !== undefined && name !== null ? name : topic.name;
   const newContent = content !== undefined && content !== null ? content : topic.content;
-  run(`UPDATE topics SET name = ?, content = ? WHERE id = ?`, [newName, newContent, id]);
+  const newCover   = cover !== undefined ? normalizeCover(cover) : topic.cover;
+  run(`UPDATE topics SET name = ?, content = ?, cover = ? WHERE id = ?`,
+    [newName, newContent, newCover ? JSON.stringify(newCover) : null, id]);
   return getTopic(id);
 }
 

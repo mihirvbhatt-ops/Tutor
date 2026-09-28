@@ -74,6 +74,20 @@ test('PATCH /api/topics/:id for a missing topic returns 404', async () => {
   assert.equal(res.status, 404);
 });
 
+test('PATCH /api/topics/:id saves a book cover, which the library listing returns; null resets it', async () => {
+  const topic = saveTopic({ name: 'Cover Topic', content: 'x', source: 'paste' });
+  const cover = { length: 'tall', width: 'wide', color: '#1A2B3C', bandColor: '#c0c0c0', bandSize: 'thick', bandType: 'none' };
+
+  const saved = await (await patch(`/api/topics/${topic.id}`, { cover })).json();
+  assert.deepEqual(saved.cover, { ...cover, color: '#1a2b3c' });
+
+  const listed = (await (await get('/api/topics')).json()).find(t => t.id === topic.id);
+  assert.deepEqual(listed.cover, saved.cover);
+
+  const reset = await (await patch(`/api/topics/${topic.id}`, { cover: null })).json();
+  assert.equal(reset.cover, null);
+});
+
 test('GET /api/courses/:id for a missing course returns 404', async () => {
   const res = await get('/api/courses/nope');
   assert.equal(res.status, 404);
