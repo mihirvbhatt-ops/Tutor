@@ -207,14 +207,41 @@ function buildMcqItems(terms) {
   return items;
 }
 
-function buildFlashcardItems(terms, clozes) {
-  const fromTerms = terms.map(({ term, definition }) => ({
+// Fill-in-the-blank as a quiz question: the blanked sentence, with the right
+// term and three other terms from the same material as the choices. A term
+// that already appears in the sentence is never a distractor — it would be
+// visibly wrong (or confusingly right) next to the blank.
+function buildClozeMcqItems(terms, clozes) {
+  if (terms.length < MCQ_OPTION_COUNT) return [];
+  const items = [];
+  for (const { term, clozeText } of clozes) {
+    const seen = new Set([term.toLowerCase()]);
+    const distractorPool = [];
+    for (const t of terms) {
+      const key = t.term.toLowerCase();
+      if (seen.has(key) || clozeText.toLowerCase().includes(key)) continue;
+      seen.add(key);
+      distractorPool.push(t.term);
+    }
+    const distractors = shuffle(distractorPool).slice(0, MCQ_OPTION_COUNT - 1);
+    if (distractors.length < MCQ_OPTION_COUNT - 1) continue;
+    items.push({
+      question: `Fill in the blank: ${clozeText}`,
+      answer:   term,
+      type:     'mcq',
+      options:  shuffle([term, ...distractors])
+    });
+  }
+  return items;
+}
+
+// Flashcards are strictly term → definition. Fill-in-the-blank items are a
+// quiz thing (buildClozeMcqItems) — as a flashcard the "front" was a whole
+// sentence from somewhere else in the material, not a term to recall.
+function buildFlashcardItems(terms) {
+  return terms.map(({ term, definition }) => ({
     question: term, answer: definition, type: 'flashcard', options: null
   }));
-  const fromCloze = clozes.map(({ term, clozeText }) => ({
-    question: clozeText, answer: term, type: 'flashcard', options: null
-  }));
-  return interleave(fromTerms, fromCloze);
 }
 
 function buildShortItems(terms, clozes) {
@@ -246,12 +273,12 @@ export function buildLocalQuestions(content, type, cap = 10) {
 
   let items;
   if (type === 'mcq') {
-    items = buildMcqItems(terms);
+    items = interleave(buildMcqItems(terms), buildClozeMcqItems(terms, clozes));
     // Not enough distinct terms to build a 4-option distractor pool at all —
     // fall back to short-answer for this batch rather than producing nothing.
     if (!items.length) items = buildShortItems(terms, clozes);
   } else if (type === 'flashcard') {
-    items = buildFlashcardItems(terms, clozes);
+    items = buildFlashcardItems(terms);
   } else {
     items = buildShortItems(terms, clozes);
   }
