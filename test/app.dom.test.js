@@ -47,7 +47,7 @@ before(() => {
   const trailer = `
 window.__T = {
   esc, markdownToHtml, formatClock, quizClockElapsedMs, computeSpineStyle,
-  statBarRow, fmtCount, wizardGenBody, countsFromInputs, loadExplainPanel
+  statBarRow, fmtCount, wizardGenBody, countsFromInputs, loadExplainPanel, addExplainModeIfAvailable
 };`;
   win.eval(appJs + '\n' + trailer);
   T = win.__T;
@@ -266,4 +266,36 @@ test('loadExplainPanel reports a failed read of the saved explanation instead of
   assert.match(body.textContent, /Couldn’t load the saved explanation/);
   assert.ok(win.document.getElementById('btn-explain-retry'));
   assert.ok(!calls.some(u => u.includes('/api/chat')));
+});
+
+// ── Explain section for topics created without "Explain" ────────────────────
+
+test('addExplainModeIfAvailable adds Explain when the topic has saved material, even though it was not picked', async () => {
+  stubFetch({
+    '/api/topics/t4/explanation': [200, null],
+    '/api/topics/t4': [200, { id: 't4', content: 'Hunter-gatherer: society that forages.' }]
+  });
+  const tab = { id: 'x1', topicId: 't4', modes: ['flashcard', 'quiz'] };
+  await T.addExplainModeIfAvailable(tab);
+  assert.deepEqual([...tab.modes], ['explain', 'flashcard', 'quiz']);
+});
+
+test('addExplainModeIfAvailable adds Explain when a saved explanation exists', async () => {
+  stubFetch({
+    '/api/topics/t5/explanation': [200, { main: '<h2>Overview</h2>', followups: [] }],
+    '/api/topics/t5': [200, { id: 't5', content: '' }]
+  });
+  const tab = { id: 'x2', topicId: 't5', modes: ['quiz'] };
+  await T.addExplainModeIfAvailable(tab);
+  assert.deepEqual([...tab.modes], ['explain', 'quiz']);
+});
+
+test('addExplainModeIfAvailable leaves the sections alone when there is nothing to explain from', async () => {
+  stubFetch({
+    '/api/topics/t6/explanation': [200, null],
+    '/api/topics/t6': [200, { id: 't6', content: '   ' }]
+  });
+  const tab = { id: 'x3', topicId: 't6', modes: ['quiz'] };
+  await T.addExplainModeIfAvailable(tab);
+  assert.deepEqual([...tab.modes], ['quiz']);
 });
