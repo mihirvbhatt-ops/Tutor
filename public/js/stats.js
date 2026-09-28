@@ -189,26 +189,13 @@ async function renderLibrary(query = '') {
   newShelf();
 
   filtered.forEach(topic => {
-    const style = bookStyle(topic.name);
+    const { book, style } = createBookElement(topic.name, topic.cover);
 
     if (currentW + style.width + 4 > SHELF_MAX_W) {
       newShelf();
     }
 
-    const book = document.createElement('div');
-    book.className = 'book';
-    book.title    = topic.name;
     book.dataset.id = topic.id;
-    book.style.cssText = `
-      --spine-base:${style.spineBase};
-      height:${style.height}px;width:${style.width}px;
-    `;
-    const span = document.createElement('span');
-    span.className   = 'book-title';
-    setSpineTitle(span, topic.name);
-    applySpineStyle(book, span, topic.name, style);
-    book.appendChild(span);
-
     book.addEventListener('click', (e) => showModePicker(topic, e.currentTarget));
     currentShelf.appendChild(book);
     currentW += style.width + 4;
@@ -271,21 +258,129 @@ async function showTopicEdit(topic) {
     <div class="mode-picker-title">Edit "${esc(full.name)}"</div>
     <input type="text" id="te-name" class="wz-input" value="${esc(full.name)}"/>
     <textarea id="te-content" class="wz-textarea" rows="8">${esc(full.content || '')}</textarea>
+    ${coverEditorHtml()}
     <div class="te-actions">
       <button class="te-btn te-primary" id="te-save">Save</button>
       <button class="te-btn" id="te-cancel">Cancel</button>
     </div>`;
+
+  const getCover = wireCoverEditor(card, () => card.querySelector('#te-name').value.trim() || full.name, full.cover);
 
   card.querySelector('#te-cancel').addEventListener('click', hideTopicEdit);
   card.querySelector('#te-save').addEventListener('click', async () => {
     const name    = card.querySelector('#te-name').value.trim();
     const content = card.querySelector('#te-content').value.trim();
     if (!name) { card.querySelector('#te-name').focus(); return; }
-    await patchReq(`/api/topics/${topic.id}`, { name, content });
+    await patchReq(`/api/topics/${topic.id}`, { name, content, cover: getCover() });
     hideTopicEdit();
     allTopics = [];
     renderLibrary();
   });
+}
+
+// ── Book cover editor (inside the Edit dialog) ───────────────────────────────
+// Each option starts on "Auto" (the name-derived look every book has by
+// default); only the options the user actually changes are saved.
+const COVER_OPTIONS = {
+  size:     [['', 'Auto'], ['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']],
+  bandSize: [['', 'Auto'], ['thin', 'Thin'], ['medium', 'Medium'], ['thick', 'Thick']],
+  bandType: [['', 'Auto'], ['asymmetric', 'Top band'], ['two-end', 'Top & bottom'], ['double', 'Long top, short bottom'], ['none', 'No band']],
+};
+
+function coverEditorHtml() {
+  const select = (id, key) => `<select id="${id}" class="te-select">${
+    COVER_OPTIONS[key].map(([v, label]) => `<option value="${v}">${label}</option>`).join('')}</select>`;
+  const colorField = (id, label) => `
+    <label class="te-field">${label}
+      <span class="te-color-row">
+        <input type="color" id="${id}"/>
+        <button type="button" class="te-auto-btn" data-for="${id}">Auto</button>
+      </span>
+    </label>`;
+  return `
+    <div class="te-cover">
+      <div class="te-cover-title">Cover</div>
+      <div class="te-cover-body">
+        <div class="te-cover-preview shelf" id="te-cover-preview"></div>
+        <div class="te-cover-fields">
+          <label class="te-field">Size ${select('te-size', 'size')}</label>
+          ${colorField('te-color', 'Colour')}
+          ${colorField('te-band-color', 'Band colour')}
+          <label class="te-field">Band size ${select('te-band-size', 'bandSize')}</label>
+          <label class="te-field">Band type ${select('te-band-type', 'bandType')}</label>
+        </div>
+      </div>
+      <button type="button" class="te-btn te-reset" id="te-cover-reset">Reset to automatic</button>
+    </div>`;
+}
+
+// CSS colour (hsl()/hex, whatever computeSpineStyle produced) → #rrggbb, so
+// a colour input can open on the book's current automatic colour.
+function cssColorToHex(css) {
+  const probe = document.createElement('span');
+  probe.style.color = css;
+  document.body.appendChild(probe);
+  const rgb = getComputedStyle(probe).color.match(/\d+/g) || ['0', '0', '0'];
+  probe.remove();
+  return '#' + rgb.slice(0, 3).map(n => Number(n).toString(16).padStart(2, '0')).join('');
+}
+
+// Wires the cover editor inside `root` and returns a getter for the cover to
+// save (null when everything is on Auto).
+function wireCoverEditor(root, getName, initialCover) {
+  const cover = { ...(initialCover || {}) };
+  const $ = sel => root.querySelector(sel);
+  const selects = { size: '#te-size', bandSize: '#te-band-size', bandType: '#te-band-type' };
+  const colors  = { color: '#te-color', bandColor: '#te-band-color' };
+
+  function autoColors() {
+    const c = pickCoverColor(getName());
+    return {
+      color: cssColorToHex(`hsl(${c.hue} ${c.sat}% ${c.light}%)`),
+      bandColor: cssColorToHex(trimColor(trimIsGold(getName())))
+    };
+  }
+
+  function syncInputs() {
+    for (const [key, sel] of Object.entries(selects)) $(sel).value = cover[key] || '';
+    const autos = autoColors();
+    for (const [key, sel] of Object.entries(colors)) {
+      $(sel).value = cover[key] || autos[key];
+      root.querySelector(`.te-auto-btn[data-for="${sel.slice(1)}"]`).classList.toggle('active', !cover[key]);
+    }
+  }
+
+  function renderPreview() {
+    const preview = $('#te-cover-preview');
+    preview.replaceChildren(createBookElement(getName(), cover).book);
+  }
+
+  for (const [key, sel] of Object.entries(selects)) {
+    $(sel).addEventListener('change', () => {
+      if ($(sel).value) cover[key] = $(sel).value; else delete cover[key];
+      renderPreview();
+    });
+  }
+  for (const [key, sel] of Object.entries(colors)) {
+    $(sel).addEventListener('input', () => {
+      cover[key] = $(sel).value;
+      syncInputs(); renderPreview();
+    });
+    root.querySelector(`.te-auto-btn[data-for="${sel.slice(1)}"]`).addEventListener('click', () => {
+      delete cover[key];
+      syncInputs(); renderPreview();
+    });
+  }
+  $('#te-cover-reset').addEventListener('click', () => {
+    for (const k of Object.keys(cover)) delete cover[k];
+    syncInputs(); renderPreview();
+  });
+  // The automatic look is derived from the name, so renaming changes it live.
+  $('#te-name').addEventListener('input', () => { syncInputs(); renderPreview(); });
+
+  syncInputs();
+  renderPreview();
+  return () => (Object.keys(cover).length ? { ...cover } : null);
 }
 get('topic-edit-overlay').addEventListener('click', (e) => {
   if (e.target.id === 'topic-edit-overlay') hideTopicEdit(); // backdrop click

@@ -47,7 +47,8 @@ before(() => {
   const trailer = `
 window.__T = {
   esc, markdownToHtml, formatClock, quizClockElapsedMs, computeSpineStyle,
-  statBarRow, fmtCount, wizardGenBody, countsFromInputs, loadExplainPanel, addExplainModeIfAvailable
+  statBarRow, fmtCount, wizardGenBody, countsFromInputs, loadExplainPanel, addExplainModeIfAvailable,
+  bookStyle, createBookElement
 };`;
   win.eval(appJs + '\n' + trailer);
   T = win.__T;
@@ -298,4 +299,34 @@ test('addExplainModeIfAvailable leaves the sections alone when there is nothing 
   const tab = { id: 'x3', topicId: 't6', modes: ['quiz'] };
   await T.addExplainModeIfAvailable(tab);
   assert.deepEqual([...tab.modes], ['quiz']);
+});
+
+// ── Custom book covers ──────────────────────────────────────────────────────
+
+test('bookStyle with no cover renders exactly as before (automatic look unchanged)', () => {
+  assert.deepEqual({ ...T.bookStyle('Photosynthesis', null) }, { ...T.bookStyle('Photosynthesis') });
+});
+
+test('bookStyle applies a custom size, spine colour, band colour, band size and type', () => {
+  const s = T.bookStyle('Photosynthesis', { size: 'large', color: '#112233', bandColor: '#aa0000', bandSize: 'thick', bandType: 'two-end' });
+  assert.equal(s.width, 36);
+  assert.ok(s.height >= 96);
+  assert.match(s.spineBase, /#112233/);
+  assert.match(s.spineBase, /#aa0000/);
+  assert.equal(s.finish, 'finish-matte');
+  assert.match(s.titleColor, /#aa0000/);
+  // "thick" two-end bands are wider than the automatic ones
+  const thin = T.bookStyle('Photosynthesis', { bandSize: 'thin', bandType: 'two-end', bandColor: '#aa0000' });
+  assert.ok(s.titleClear < thin.titleClear);
+});
+
+test('bookStyle with bandType "none" draws no band at all', () => {
+  const s = T.bookStyle('Photosynthesis', { bandType: 'none', color: '#112233' });
+  assert.equal(s.spineBase, '#112233');
+});
+
+test('createBookElement builds the same spine the library shelf shows', () => {
+  const { book, style } = T.createBookElement('Trojan War', { size: 'small' });
+  assert.equal(book.style.width, `${style.width}px`);
+  assert.equal(book.querySelector('.book-title').textContent, 'TrojanWar');
 });

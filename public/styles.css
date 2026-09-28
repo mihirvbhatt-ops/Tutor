@@ -1466,6 +1466,37 @@ a.ghost-btn{display:inline-block;text-decoration:none;text-align:center}
   font-weight: 700;
 }
 
+/* Book cover editor inside the topic edit form — same palette as above. */
+.te-cover { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 8px; }
+.te-cover-title { color: #f2dfa4; font-weight: 700; font-size: .9rem; }
+.te-cover-body { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+/* A single shelf plank so the preview book sits exactly as on the library shelf. */
+/* Height grows with the book (a large cover with a long title can reach ~186px). */
+.te-cover-preview.shelf { width: 84px; height: auto; min-height: 120px; justify-content: center; flex-shrink: 0; }
+.te-cover-fields { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.te-field {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  color: #efe2c4; font-size: .8rem;
+}
+.te-select {
+  background: rgba(255,255,255,.04); color: #efe2c4;
+  border: 1px solid #7c5b1e; border-radius: 6px; padding: 4px 6px; font-size: .8rem;
+  /* Fixed width so the longest option ("Long top, short bottom") can't push
+     the fields past the dialog edge on a phone. */
+  width: 108px; flex-shrink: 0;
+}
+.te-select option { background: #2a1608; }
+.te-color-row { display: flex; align-items: center; gap: 6px; }
+.te-color-row input[type=color] {
+  width: 34px; height: 24px; padding: 0; border: 1px solid #7c5b1e; border-radius: 4px; background: none;
+}
+.te-auto-btn {
+  background: none; border: 1px solid #7c5b1e; color: #c9b48a;
+  border-radius: 6px; padding: 2px 8px; font-size: .75rem;
+}
+.te-auto-btn.active { background: #7c5b1e; color: #f2dfa4; }
+.te-btn.te-reset { flex: none; align-self: flex-start; }
+
 /* ── Course/topic/question stats popups ───────────────────────────────────── */
 /* Reuses .mode-picker-card as the popup shell; these are just its rows. */
 .stats-popup-card { text-align: left; }

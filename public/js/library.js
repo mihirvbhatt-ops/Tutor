@@ -42,8 +42,7 @@ function trimColor(gold) {
 }
 
 // A single (un-mirrored), flat-coloured band at one edge.
-function metallicBandAt(edge, margin, width, gold) {
-  const color = trimColor(gold);
+function metallicBandAt(edge, margin, width, color) {
   const end = margin + width;
   if (edge === 'bottom') {
     return `linear-gradient(180deg,
@@ -64,10 +63,15 @@ function metallicBandAt(edge, margin, width, gold) {
 // and bottom (name stays centred); 'double' also trims both ends, but the
 // top one is drawn a little longer than usual and the bottom one fairly
 // shorter (name still centred, just clears whichever end is bigger).
+// 'none' (no band at all) is only ever chosen by the user — see COVER_OPTIONS.
 const TRIM_TYPES = ['asymmetric', 'two-end', 'double'];
 function pickTrimType(name) {
   return TRIM_TYPES[hashNum(name, 110) % TRIM_TYPES.length];
 }
+
+// Band thickness multipliers for a user-chosen band size ("medium" is the
+// automatic size every book has always had).
+const BAND_SIZE_SCALE = { thin: 0.6, medium: 1, thick: 1.6 };
 
 const TRIM_MARGIN      = 8;
 const TRIM_WIDTH       = 7;   // 'two-end' — same size both ends
@@ -83,15 +87,20 @@ const ASYM_WIDTH  = 19;
 // book's height, the title needs to start to clear the band) and
 // `titleClear` (the %-of-height the title may occupy without running into
 // a band).
-function buildSpineLayers(bc, trimType, gold) {
+function buildSpineLayers(bc, trimType, bandColor, bandScale = 1) {
   const base = baseGradientLayer(bc);
 
+  if (trimType === 'none') {
+    return { spineBase: base, justify: 'center', titleOffsetPct: 0, titleClear: 86 };
+  }
+
   if (trimType === 'asymmetric') {
+    const asymWidth = Math.round(ASYM_WIDTH * bandScale);
     const layers = [
-      metallicBandAt('top', ASYM_MARGIN, ASYM_WIDTH, gold),
+      metallicBandAt('top', ASYM_MARGIN, asymWidth, bandColor),
       base,
     ];
-    const bandEnd = ASYM_MARGIN + ASYM_WIDTH;
+    const bandEnd = ASYM_MARGIN + asymWidth;
     const belowBand = 100 - bandEnd;
     return {
       spineBase: layers.join(', '),
@@ -101,11 +110,11 @@ function buildSpineLayers(bc, trimType, gold) {
     };
   }
 
-  const topWidth    = trimType === 'double' ? TRIM_LONG_WIDTH  : TRIM_WIDTH;
-  const bottomWidth = trimType === 'double' ? TRIM_SHORT_WIDTH : TRIM_WIDTH;
+  const topWidth    = Math.max(1, Math.round((trimType === 'double' ? TRIM_LONG_WIDTH  : TRIM_WIDTH) * bandScale));
+  const bottomWidth = Math.max(1, Math.round((trimType === 'double' ? TRIM_SHORT_WIDTH : TRIM_WIDTH) * bandScale));
   const layers = [
-    metallicBandAt('top', TRIM_MARGIN, topWidth, gold),
-    metallicBandAt('bottom', TRIM_MARGIN, bottomWidth, gold),
+    metallicBandAt('top', TRIM_MARGIN, topWidth, bandColor),
+    metallicBandAt('bottom', TRIM_MARGIN, bottomWidth, bandColor),
     base,
   ];
   const largerClear = TRIM_MARGIN + Math.max(topWidth, bottomWidth);
@@ -160,15 +169,40 @@ const MIN_FONT_PX       = 5.5;
 // capped so one very long title can't blow out the shelf row — past that
 // cap, the font itself shrinks (down to a floor) as a last resort before
 // falling back to the CSS ellipsis.
-function computeSpineStyle(name, { heightBase, widthBase, widthSpan }) {
-  const color = pickCoverColor(name);
-  const bc    = `hsl(${color.hue} ${color.sat}% ${color.light}%)`;
+// Book sizes the user can pick instead of the automatic, name-derived one.
+// Height is still a baseline: a long title grows the book the same way it
+// does for an automatic size.
+const COVER_SIZE_PRESETS = {
+  small:  { heightBase: 56, width: 18 },
+  medium: { heightBase: 72, width: 26 },
+  large:  { heightBase: 96, width: 36 },
+};
 
-  const trimType = pickTrimType(name);
-  const gold     = trimIsGold(name);
-  const { spineBase, justify, titleClear, titleOffsetPct } = buildSpineLayers(bc, trimType, gold);
+// `cover` (optional, per topic — see normalizeCover in db/sqlite.js) overrides
+// any of: size, color (spine), bandColor, bandSize, bandType. Every field it
+// doesn't set keeps its automatic value, so an uncustomised book renders
+// exactly as before.
+function computeSpineStyle(name, { heightBase, widthBase, widthSpan }, cover = null) {
+  cover = cover || {};
+  const color  = pickCoverColor(name);
+  const finish = cover.color ? 'finish-matte' : color.finish;
+  const bc     = cover.color || `hsl(${color.hue} ${color.sat}% ${color.light}%)`;
 
-  const jitter  = hashNum(name, 7) % 7;
+  const trimType  = cover.bandType || pickTrimType(name);
+  const gold      = trimIsGold(name);
+  const bandColor = cover.bandColor || trimColor(gold);
+  const bandScale = BAND_SIZE_SCALE[cover.bandSize] || 1;
+  const { spineBase, justify, titleClear, titleOffsetPct } = buildSpineLayers(bc, trimType, bandColor, bandScale);
+  // The title is tinted to match the band: the original gold/silver tints,
+  // or a lightened version of a custom band colour.
+  const titleColor = cover.bandColor
+    ? `color-mix(in srgb, ${cover.bandColor} 70%, white)`
+    : (gold ? 'hsl(46 90% 66%)' : 'hsl(210 14% 90%)');
+
+  const preset = COVER_SIZE_PRESETS[cover.size];
+  if (preset) heightBase = preset.heightBase;
+
+  const jitter  = preset ? 0 : hashNum(name, 7) % 7;
   const longest = longestTitleLine(name);
   const requiredAvailablePx = longest * DEFAULT_FONT_PX * CHAR_HEIGHT_RATIO + 4;
   const requiredHeight      = Math.ceil(requiredAvailablePx / (titleClear / 100));
@@ -186,20 +220,21 @@ function computeSpineStyle(name, { heightBase, widthBase, widthSpan }) {
   const titleOffsetPx = Math.round(height * (titleOffsetPct / 100));
 
   return {
-    finish: color.finish,
+    finish,
     spineBase,
     justify,
     titleClear,
     titleOffsetPx,
     gold,
+    titleColor,
     fontSize,
     height,
-    width: Math.round(widthBase + (hashNum(name, 13) % widthSpan)),
+    width: preset ? preset.width : Math.round(widthBase + (hashNum(name, 13) % widthSpan)),
   };
 }
 
-function bookStyle(name) {
-  return computeSpineStyle(name, { heightBase: 64, widthBase: 19, widthSpan: 22 });
+function bookStyle(name, cover = null) {
+  return computeSpineStyle(name, { heightBase: 64, widthBase: 19, widthSpan: 22 }, cover);
 }
 // Slightly taller/wider baseline — course spines are drawn more prominent.
 function courseStyle(name) {
@@ -248,12 +283,31 @@ function applySpineStyle(book, span, name, style) {
   span.style.maxHeight = style.titleClear + '%';
   span.style.marginTop = style.titleOffsetPx + 'px';
   span.style.fontSize  = style.fontSize + 'px';
-  span.style.color = style.gold ? 'hsl(46 90% 66%)' : 'hsl(210 14% 90%)';
+  span.style.color = style.titleColor;
   const font = spineFont(name);
   span.style.fontFamily     = font.family;
   span.style.fontWeight     = font.weight;
   span.style.letterSpacing  = font.spacing;
   span.style.fontVariant    = font.variant || 'normal';
+}
+
+// A topic's spine element, shared by the library shelf and the Edit dialog's
+// live cover preview so the two can never render a book differently.
+function createBookElement(name, cover) {
+  const style = bookStyle(name, cover);
+  const book = document.createElement('div');
+  book.className = 'book';
+  book.title = name;
+  book.style.cssText = `
+    --spine-base:${style.spineBase};
+    height:${style.height}px;width:${style.width}px;
+  `;
+  const span = document.createElement('span');
+  span.className = 'book-title';
+  setSpineTitle(span, name);
+  applySpineStyle(book, span, name, style);
+  book.appendChild(span);
+  return { book, style };
 }
 
 // Bookcases always show this many shelf rows, whether or not there are

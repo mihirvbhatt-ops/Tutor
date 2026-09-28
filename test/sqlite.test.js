@@ -45,6 +45,23 @@ test('updateTopic patches only the given fields, leaving the rest untouched', ()
   assert.equal(updated.content, 'Light -> chemical energy'); // untouched
 });
 
+test('normalizeCover keeps only valid cover fields and returns null when nothing valid remains', () => {
+  assert.deepEqual(
+    db.normalizeCover({ size: 'small', color: '#ABCDEF', bandColor: 'red', bandSize: 'huge', bandType: 'double', extra: 1 }),
+    { size: 'small', color: '#abcdef', bandType: 'double' }
+  );
+  assert.equal(db.normalizeCover({ color: 'url(javascript:x)' }), null);
+  assert.equal(db.normalizeCover(null), null);
+  assert.equal(db.normalizeCover(['small']), null);
+});
+
+test('updateTopic leaves an existing cover untouched when no cover is passed', () => {
+  const t = db.saveTopic({ name: 'Covered', content: 'c', source: 'paste' });
+  db.updateTopic(t.id, { cover: { bandType: 'none' } });
+  const renamed = db.updateTopic(t.id, { name: 'Covered 2' });
+  assert.deepEqual(renamed.cover, { bandType: 'none' });
+});
+
 test('updateTopic on a missing id returns null', () => {
   assert.equal(db.updateTopic('does-not-exist', { name: 'x' }), null);
 });
