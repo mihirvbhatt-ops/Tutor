@@ -20,6 +20,10 @@ get('btn-create-topic').addEventListener('click', () => {
   get('setup-gen-source').classList.add('hidden');
   uploadedFile = null;
   uploadedFileText = null;
+  // The <input type=file> keeps its selection across wizard runs, so picking
+  // the same file again wasn't a "change" and never fired the upload — it
+  // only worked after a page reload. Clear it along with the label.
+  get('file-input').value = '';
   materialType = 'paste'; // matches the tab that's active by default
   get('file-review').classList.add('hidden');
   get('file-label').textContent = 'Drop a PDF, Word (.docx), PowerPoint (.pptx) or .txt — or tap to browse';
@@ -118,6 +122,7 @@ get('file-input').addEventListener('change', async () => {
   if (data.error) {
     get('file-label').textContent = `⚠ ${data.error}`;
     get('file-drop').classList.remove('has-file');
+    get('file-input').value = ''; // so retrying the same file fires "change" again
     uploadedFile = null;
     return;
   }

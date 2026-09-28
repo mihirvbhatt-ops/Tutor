@@ -457,8 +457,11 @@ function genChooserButtonsHtml(idPrefix) {
 // independent counts instead of one shared number. Read by whichever
 // gen-source button is clicked; omitted (null) counts fall back to the
 // server's own defaults for that source.
+// Local extraction is free, so its ceiling is higher than the AI tier's
+// cost-bound one. Keep in sync with AI_COUNT_MAX / LOCAL_COUNT_MAX in server.js.
 const COUNT_MIN = 1;
-const COUNT_MAX = 25;
+const AI_COUNT_MAX = 25;
+const LOCAL_COUNT_MAX = 50;
 const COUNT_DEFAULT = 10;
 
 function countPickerHtml(idPrefix) {
@@ -466,24 +469,35 @@ function countPickerHtml(idPrefix) {
     <div class="count-picker" role="group" aria-label="Number of questions per source">
       <label class="count-field">
         <span class="count-field-label">🤖 AI count</span>
-        <input type="number" class="count-input" id="${idPrefix}-ai" min="${COUNT_MIN}" max="${COUNT_MAX}" value="${COUNT_DEFAULT}" inputmode="numeric"/>
+        <input type="number" class="count-input" id="${idPrefix}-ai" min="${COUNT_MIN}" max="${AI_COUNT_MAX}" value="${COUNT_DEFAULT}" inputmode="numeric"/>
       </label>
       <label class="count-field">
         <span class="count-field-label">📖 Local count</span>
-        <input type="number" class="count-input" id="${idPrefix}-local" min="${COUNT_MIN}" max="${COUNT_MAX}" value="${COUNT_DEFAULT}" inputmode="numeric"/>
+        <input type="number" class="count-input" id="${idPrefix}-local" min="${COUNT_MIN}" max="${LOCAL_COUNT_MAX}" value="${COUNT_DEFAULT}" inputmode="numeric"/>
       </label>
     </div>`;
 }
 
-function readCount(id) {
+// An out-of-range number is clamped to the nearest bound — and written back
+// into the input so the user sees what they'll actually get — rather than
+// discarded. Discarding used to fall through to the server default, so
+// asking for 30 silently produced 10. Blank/non-numeric still → null
+// (server default).
+function readCount(id, max) {
   const el = get(id);
   if (!el) return null;
   const n = parseInt(el.value, 10);
-  return Number.isInteger(n) && n >= COUNT_MIN && n <= COUNT_MAX ? n : null;
+  if (!Number.isInteger(n)) return null;
+  const clamped = Math.min(Math.max(n, COUNT_MIN), max);
+  if (clamped !== n) el.value = String(clamped);
+  return clamped;
 }
 
 function countsFromInputs(idPrefix) {
-  return { aiCount: readCount(`${idPrefix}-ai`), localCount: readCount(`${idPrefix}-local`) };
+  return {
+    aiCount: readCount(`${idPrefix}-ai`, AI_COUNT_MAX),
+    localCount: readCount(`${idPrefix}-local`, LOCAL_COUNT_MAX)
+  };
 }
 
 function renderPanelGenChooser(containerEl, { glyph, title, hint, idPrefix, onChoose }) {

@@ -47,7 +47,7 @@ before(() => {
   const trailer = `
 window.__T = {
   esc, markdownToHtml, formatClock, quizClockElapsedMs, computeSpineStyle,
-  statBarRow, fmtCount, wizardGenBody
+  statBarRow, fmtCount, wizardGenBody, countsFromInputs
 };`;
   win.eval(appJs + '\n' + trailer);
   T = win.__T;
@@ -182,4 +182,41 @@ test('wizardGenBody defaults to hybrid source with no explicit wizardData', () =
   const body = T.wizardGenBody('quiz');
   assert.equal(body.mode, 'quiz');
   assert.equal(body.source, 'hybrid');
+});
+
+// ── Question-count inputs ───────────────────────────────────────────────────
+
+test('countsFromInputs clamps an over-limit count to that source\'s maximum and shows it in the input', () => {
+  const ai = win.document.getElementById('wz-count-ai');
+  const local = win.document.getElementById('wz-count-local');
+  ai.value = '40';
+  local.value = '80';
+  const counts = T.countsFromInputs('wz-count');
+  assert.deepEqual({ ...counts }, { aiCount: 25, localCount: 50 });
+  assert.equal(ai.value, '25');
+  assert.equal(local.value, '50');
+});
+
+test('countsFromInputs keeps an in-range count and treats a blank one as "use the server default"', () => {
+  win.document.getElementById('wz-count-ai').value = '';
+  win.document.getElementById('wz-count-local').value = '38';
+  const counts = T.countsFromInputs('wz-count');
+  assert.deepEqual({ ...counts }, { aiCount: null, localCount: 38 });
+});
+
+// ── Wizard file input reset ─────────────────────────────────────────────────
+
+test('starting a new topic clears the file input so re-picking the same file fires "change" again', () => {
+  const input = win.document.getElementById('file-input');
+  let assigned = null;
+  // jsdom can't hold a real file selection; stand in for one that survived
+  // from the previous wizard run and record what the reset writes.
+  Object.defineProperty(input, 'value', {
+    configurable: true,
+    get: () => 'C:\\fakepath\\guide.docx',
+    set: v => { assigned = v; }
+  });
+  win.document.getElementById('btn-create-topic').click();
+  delete input.value;
+  assert.equal(assigned, '');
 });

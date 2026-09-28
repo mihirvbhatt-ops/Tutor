@@ -406,6 +406,17 @@ test('POST /api/topics/:id/generate-questions (quiz) produces 4-option mcq from 
   }
 });
 
+test('POST /api/topics/:id/generate-questions clamps a local count above 25 instead of silently falling back to 10', async () => {
+  const lines = Array.from({ length: 60 }, (_, i) => `Term${String.fromCharCode(65 + (i % 26))}${i}: definition number ${i} for this glossary entry.`);
+  const topic = saveTopic({ name: 'Big Glossary', content: lines.join('\n'), source: 'paste' });
+
+  const thirty = await (await post(`/api/topics/${topic.id}/generate-questions`, { mode: 'flashcard', source: 'local', localCount: 30 })).json();
+  assert.equal(thirty.length, 30);
+
+  const huge = await (await post(`/api/topics/${topic.id}/generate-questions`, { mode: 'flashcard', source: 'local', localCount: 999 })).json();
+  assert.equal(huge.length, 50, 'clamped to the local maximum, not the default of 10');
+});
+
 test('POST /api/topics/:id/generate-questions with an invalid mode returns 400', async () => {
   const topic = seedTopic('Bad Mode Topic');
   const res = await post(`/api/topics/${topic.id}/generate-questions`, { mode: 'nonsense' });
