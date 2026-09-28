@@ -198,3 +198,33 @@ test('extractCloze blanks out a term that starts or ends with a non-ASCII or non
   assert.equal(clozes.length, 1);
   assert.equal(clozes[0].clozeText, 'Aristotle tied the _____ to the body.');
 });
+
+test('extractCloze does not build a cloze from a piece of the term\'s own definition line', () => {
+  // The internal "c." and the second colon make splitSentences cut each line
+  // into pieces that never equal the full line.
+  const content = [
+    'Aristotle: Plato’s student, c. 384–322 BCE, who rejected the wandering soul.',
+    'Study Guide: Definitions: Definitions are drawn from the course reading.'
+  ].join('\n');
+  const clozes = extractCloze(content, extractTerms(content));
+  assert.deepEqual(clozes, []);
+});
+
+test('extractCloze still uses a genuine mention of the term on another line', () => {
+  const content = [
+    'Aristotle: Plato’s student, c. 384–322 BCE, who rejected the wandering soul.',
+    'Unlike Plato, Aristotle tied the soul to the body.'
+  ].join('\n');
+  const clozes = extractCloze(content, extractTerms(content));
+  assert.equal(clozes.length, 1);
+  assert.equal(clozes[0].clozeText, 'Unlike Plato, _____ tied the soul to the body.');
+});
+
+test('extractCloze skips a mention that is only part of another entry\'s term label', () => {
+  const content = [
+    'Agency: attributing intention and purpose to events and objects.',
+    'Agency / agency detection: the tendency to see intentional agents behind events.'
+  ].join('\n');
+  const clozes = extractCloze(content, extractTerms(content));
+  assert.equal(clozes.find(c => c.term === 'Agency'), undefined);
+});

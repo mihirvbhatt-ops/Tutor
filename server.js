@@ -691,14 +691,21 @@ async function generateQuestionsLocally(topic, type, count, { fullSet = false } 
 
 const LOCAL_CAP = 10;
 const COUNT_MIN = 1;
-const COUNT_MAX = 25;
+// Local extraction is free, so it can go well past the AI tier's cost-bound
+// ceiling — a 40-term study guide should be able to yield 40 flashcards.
+const AI_COUNT_MAX = 25;
+const LOCAL_COUNT_MAX = 50;
 
 // Caller-supplied override for how many questions to generate from each
 // source, so "With AI"/"Without AI"/"Both" aren't stuck at fixed sizes.
-// Falls back to the previous hardcoded default when omitted or out of range.
-function clampCount(value, fallback) {
-  const n = Number(value);
-  return Number.isInteger(n) && n >= COUNT_MIN && n <= COUNT_MAX ? n : fallback;
+// Falls back to the previous hardcoded default only when omitted or not a
+// number; an out-of-range number is clamped to the nearest bound instead of
+// being silently discarded (asking for 30 used to quietly produce 10).
+function clampCount(value, fallback, max) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(n, COUNT_MIN), max);
 }
 
 function normalizeQuestionText(text) {
@@ -717,8 +724,8 @@ app.post('/api/topics/:id/generate-questions', async (req, res) => {
     return res.status(400).json({ error: 'source must be "hybrid", "local", or "ai"' });
   }
   const itemType = mode === 'flashcard' ? 'flashcard' : 'mcq';
-  const resolvedLocalCap = clampCount(localCount, LOCAL_CAP);
-  const resolvedAiCount  = clampCount(aiCount, source === 'ai' ? FULL_AI_COUNT : HARD_TIER_COUNT);
+  const resolvedLocalCap = clampCount(localCount, LOCAL_CAP, LOCAL_COUNT_MAX);
+  const resolvedAiCount  = clampCount(aiCount, source === 'ai' ? FULL_AI_COUNT : HARD_TIER_COUNT, AI_COUNT_MAX);
 
   // 'local' — zero-API-call pattern extraction only. 'ai' — skips local
   // extraction entirely and asks the model for a full well-rounded set.

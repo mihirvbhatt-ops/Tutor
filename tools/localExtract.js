@@ -91,9 +91,21 @@ function wholeWordRe(term) {
 }
 
 // Whole-word search for `term` in a sentence other than `ownSentence`.
-function findOtherMention(term, ownSentence, sentences) {
+// `ownSentence` is a whole glossary line for "Term: definition" entries,
+// which splitSentences() may have cut into several pieces ("…Definitions:
+// Definitions are drawn… notes." / "Aristotle: Plato's student, c." / "384…")
+// — none equal to the full line, so the term's own definition used to come
+// back as its "other mention" and become a cloze card of itself. Any sentence
+// that's part of the term's own line doesn't count.
+function findOtherMention(term, ownSentence, sentences, accept = () => true) {
   const re = wholeWordRe(term);
-  return sentences.find(s => s !== ownSentence && re.test(s));
+  const own = ownSentence.replace(/\s+/g, ' ').trim();
+  return sentences.find(s => !own.includes(s) && re.test(s) && accept(s));
+}
+
+// The "Term" part of a "Term: definition" sentence, or '' for plain prose.
+function glossaryLabel(sentence) {
+  return /^([^:]{1,120}):\s/.exec(sentence)?.[1] ?? '';
 }
 
 // Extracts { term, definition, sourceSentence } triples from glossary-style
@@ -147,7 +159,11 @@ export function extractCloze(content, terms) {
   const clozes = [];
 
   for (const { term, sourceSentence } of terms) {
-    const hit = findOtherMention(term, sourceSentence, sentences);
+    // A mention inside another entry's label ("Agency / agency detection:",
+    // a duplicate "Polytheism: See Part 1", a title line) isn't the term used
+    // in context — blanking it makes a card that tests nothing. Only a use
+    // in the body of a sentence counts.
+    const hit = findOtherMention(term, sourceSentence, sentences, s => !wholeWordRe(term).test(glossaryLabel(s)));
     if (!hit) continue;
     const wordRe = wholeWordRe(term);
     clozes.push({ term, clozeText: hit.replace(wordRe, CLOZE_BLANK) });
