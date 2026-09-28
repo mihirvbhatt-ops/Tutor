@@ -282,7 +282,8 @@ async function showTopicEdit(topic) {
 // Each option starts on "Auto" (the name-derived look every book has by
 // default); only the options the user actually changes are saved.
 const COVER_OPTIONS = {
-  size:     [['', 'Auto'], ['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']],
+  length:   [['', 'Auto'], ['short', 'Short'], ['medium', 'Medium'], ['tall', 'Tall']],
+  width:    [['', 'Auto'], ['thin', 'Thin'], ['medium', 'Medium'], ['wide', 'Wide']],
   bandSize: [['', 'Auto'], ['thin', 'Thin'], ['medium', 'Medium'], ['thick', 'Thick']],
   bandType: [['', 'Auto'], ['asymmetric', 'Top band'], ['two-end', 'Top & bottom'], ['double', 'Long top, short bottom'], ['none', 'No band']],
 };
@@ -303,7 +304,8 @@ function coverEditorHtml() {
       <div class="te-cover-body">
         <div class="te-cover-preview shelf" id="te-cover-preview"></div>
         <div class="te-cover-fields">
-          <label class="te-field">Size ${select('te-size', 'size')}</label>
+          <label class="te-field">Length ${select('te-length', 'length')}</label>
+          <label class="te-field">Width ${select('te-width', 'width')}</label>
           ${colorField('te-color', 'Colour')}
           ${colorField('te-band-color', 'Band colour')}
           <label class="te-field">Band size ${select('te-band-size', 'bandSize')}</label>
@@ -330,7 +332,7 @@ function cssColorToHex(css) {
 function wireCoverEditor(root, getName, initialCover) {
   const cover = { ...(initialCover || {}) };
   const $ = sel => root.querySelector(sel);
-  const selects = { size: '#te-size', bandSize: '#te-band-size', bandType: '#te-band-type' };
+  const selects = { length: '#te-length', width: '#te-width', bandSize: '#te-band-size', bandType: '#te-band-type' };
   const colors  = { color: '#te-color', bandColor: '#te-band-color' };
 
   function autoColors() {

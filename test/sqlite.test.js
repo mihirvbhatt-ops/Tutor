@@ -47,8 +47,8 @@ test('updateTopic patches only the given fields, leaving the rest untouched', ()
 
 test('normalizeCover keeps only valid cover fields and returns null when nothing valid remains', () => {
   assert.deepEqual(
-    db.normalizeCover({ size: 'small', color: '#ABCDEF', bandColor: 'red', bandSize: 'huge', bandType: 'double', extra: 1 }),
-    { size: 'small', color: '#abcdef', bandType: 'double' }
+    db.normalizeCover({ length: 'short', width: 'giant', color: '#ABCDEF', bandColor: 'red', bandSize: 'huge', bandType: 'double', extra: 1 }),
+    { length: 'short', color: '#abcdef', bandType: 'double' }
   );
   assert.equal(db.normalizeCover({ color: 'url(javascript:x)' }), null);
   assert.equal(db.normalizeCover(null), null);

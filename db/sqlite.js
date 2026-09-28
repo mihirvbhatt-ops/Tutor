@@ -229,7 +229,7 @@ const MIGRATIONS = [
     version: 4,
     // Library book covers the user customised (see normalizeCover). NULL —
     // every existing row — keeps the automatic, name-derived cover.
-    description: 'topics: add cover column (JSON: size, color, bandColor, bandSize, bandType)',
+    description: 'topics: add cover column (JSON: length, width, color, bandColor, bandSize, bandType)',
     run: () => run(`ALTER TABLE topics ADD COLUMN cover TEXT DEFAULT NULL`)
   }
 ];
@@ -415,7 +415,9 @@ export function getTopic(id) {
 // Every field is optional; a missing one stays automatic (derived from the
 // topic name in public/js/library.js). Anything unrecognised is dropped
 // rather than stored, so a bad value can't break the library's rendering.
-export const COVER_SIZES      = ['small', 'medium', 'large'];
+// length = how tall the book stands on the shelf; width = spine thickness.
+export const COVER_LENGTHS    = ['short', 'medium', 'tall'];
+export const COVER_WIDTHS     = ['thin', 'medium', 'wide'];
 export const COVER_BAND_SIZES = ['thin', 'medium', 'thick'];
 export const COVER_BAND_TYPES = ['asymmetric', 'two-end', 'double', 'none'];
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
@@ -423,7 +425,8 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 export function normalizeCover(cover) {
   if (!cover || typeof cover !== 'object' || Array.isArray(cover)) return null;
   const out = {};
-  if (COVER_SIZES.includes(cover.size)) out.size = cover.size;
+  if (COVER_LENGTHS.includes(cover.length)) out.length = cover.length;
+  if (COVER_WIDTHS.includes(cover.width)) out.width = cover.width;
   if (typeof cover.color === 'string' && HEX_COLOR.test(cover.color)) out.color = cover.color.toLowerCase();
   if (typeof cover.bandColor === 'string' && HEX_COLOR.test(cover.bandColor)) out.bandColor = cover.bandColor.toLowerCase();
   if (COVER_BAND_SIZES.includes(cover.bandSize)) out.bandSize = cover.bandSize;

@@ -169,17 +169,17 @@ const MIN_FONT_PX       = 5.5;
 // capped so one very long title can't blow out the shelf row — past that
 // cap, the font itself shrinks (down to a floor) as a last resort before
 // falling back to the CSS ellipsis.
-// Book sizes the user can pick instead of the automatic, name-derived one.
-// Height is still a baseline: a long title grows the book the same way it
-// does for an automatic size.
-const COVER_SIZE_PRESETS = {
-  small:  { heightBase: 56, width: 18 },
-  medium: { heightBase: 72, width: 26 },
-  large:  { heightBase: 96, width: 36 },
-};
+// Book length (how tall it stands) and width (spine thickness) the user can
+// pick, independently, instead of the automatic name-derived ones. A chosen
+// length is exact — the book doesn't grow to fit its title the way an
+// automatic one does (that would make Short/Medium/Tall look identical for
+// most titles); the title's font shrinks to fit instead, as it already does
+// for over-long titles. The values span the automatic range (~64–154px).
+const COVER_LENGTH_PX = { short: 84, medium: 116, tall: 150 };
+const COVER_WIDTH_PX  = { thin: 18, medium: 26, wide: 36 };
 
 // `cover` (optional, per topic — see normalizeCover in db/sqlite.js) overrides
-// any of: size, color (spine), bandColor, bandSize, bandType. Every field it
+// any of: length, width, color (spine), bandColor, bandSize, bandType. Every field it
 // doesn't set keeps its automatic value, so an uncustomised book renders
 // exactly as before.
 function computeSpineStyle(name, { heightBase, widthBase, widthSpan }, cover = null) {
@@ -199,14 +199,13 @@ function computeSpineStyle(name, { heightBase, widthBase, widthSpan }, cover = n
     ? `color-mix(in srgb, ${cover.bandColor} 70%, white)`
     : (gold ? 'hsl(46 90% 66%)' : 'hsl(210 14% 90%)');
 
-  const preset = COVER_SIZE_PRESETS[cover.size];
-  if (preset) heightBase = preset.heightBase;
-
-  const jitter  = preset ? 0 : hashNum(name, 7) % 7;
+  const customLength = COVER_LENGTH_PX[cover.length];
+  const jitter  = hashNum(name, 7) % 7;
   const longest = longestTitleLine(name);
   const requiredAvailablePx = longest * DEFAULT_FONT_PX * CHAR_HEIGHT_RATIO + 4;
   const requiredHeight      = Math.ceil(requiredAvailablePx / (titleClear / 100));
-  const height = Math.min(Math.max(heightBase + jitter, requiredHeight), heightBase + 90);
+  const height = customLength
+    || Math.min(Math.max(heightBase + jitter, requiredHeight), heightBase + 90);
 
   const availablePx = height * (titleClear / 100);
   const fitFontPx   = (availablePx - 4) / (longest * CHAR_HEIGHT_RATIO);
@@ -229,7 +228,7 @@ function computeSpineStyle(name, { heightBase, widthBase, widthSpan }, cover = n
     titleColor,
     fontSize,
     height,
-    width: preset ? preset.width : Math.round(widthBase + (hashNum(name, 13) % widthSpan)),
+    width: COVER_WIDTH_PX[cover.width] || Math.round(widthBase + (hashNum(name, 13) % widthSpan)),
   };
 }
 
