@@ -66,11 +66,47 @@ test('extractCloze blanks a term out of a different sentence that uses it', () =
   assert.equal(clozes[0].term, 'Enzyme');
 });
 
-test('buildLocalQuestions("flashcard") returns term-based and cloze-based cards', () => {
+test('buildLocalQuestions("flashcard") returns term → definition cards', () => {
   const items = buildLocalQuestions(GLOSSARY, 'flashcard', 10);
   assert.ok(items.length > 0);
   assert.ok(items.every(q => q.type === 'flashcard' && q.options === null));
   assert.ok(items.some(q => q.question === 'Mitochondria' && /ATP/.test(q.answer)));
+});
+
+// Material where every term also gets a genuine cloze (each is mentioned in
+// another term's definition).
+const CROSS_REFERENCED = [
+  'Plato: Greek philosopher who taught Aristotle and wrote The Republic.',
+  'Aristotle: student of Plato who tied the soul to the body.',
+  'Homer: early poet whose epics shaped the ideas of Plato and Aristotle.',
+  'Pythagoras: early thinker whose soul-recycling idea Plato later developed.',
+  'Socrates: teacher of Plato, known through the dialogues.'
+].join('\n');
+
+test('buildLocalQuestions("flashcard") never includes fill-in-the-blank cards, even when clozes exist', () => {
+  assert.ok(extractCloze(CROSS_REFERENCED, extractTerms(CROSS_REFERENCED)).length > 0, 'fixture should produce clozes');
+  const items = buildLocalQuestions(CROSS_REFERENCED, 'flashcard', 50);
+  const terms = extractTerms(CROSS_REFERENCED).map(t => t.term);
+  assert.deepEqual(items.map(q => q.question), terms);
+  assert.ok(items.every(q => !q.question.includes('_____')));
+});
+
+test('buildLocalQuestions("mcq") turns fill-in-the-blanks into 4-option quiz questions whose choices are terms', () => {
+  const items = buildLocalQuestions(CROSS_REFERENCED, 'mcq', 50);
+  const terms = new Set(extractTerms(CROSS_REFERENCED).map(t => t.term));
+  const clozeQs = items.filter(q => q.question.startsWith('Fill in the blank: '));
+  assert.ok(clozeQs.length > 0);
+  assert.ok(items.some(q => q.question.startsWith('Which of the following best defines')), 'definition MCQs still included');
+  for (const q of clozeQs) {
+    assert.equal(q.type, 'mcq');
+    assert.equal(q.options.length, 4);
+    assert.equal(new Set(q.options).size, 4);
+    assert.ok(q.options.includes(q.answer));
+    assert.ok(q.options.every(o => terms.has(o)), `options should all be terms: ${JSON.stringify(q.options)}`);
+    // a term already visible in the sentence is never offered as a distractor
+    const sentence = q.question.toLowerCase();
+    assert.ok(q.options.filter(o => o !== q.answer).every(o => !sentence.includes(o.toLowerCase())));
+  }
 });
 
 test('buildLocalQuestions("mcq") builds 4-option questions when >=4 terms exist', () => {
