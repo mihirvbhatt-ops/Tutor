@@ -310,7 +310,7 @@ test('bookStyle with no cover renders exactly as before (automatic look unchange
 test('bookStyle applies a custom length, width, spine colour, band colour, band size and type', () => {
   const s = T.bookStyle('Photosynthesis', { length: 'tall', width: 'wide', color: '#112233', bandColor: '#aa0000', bandSize: 'thick', bandType: 'two-end' });
   assert.equal(s.width, 36);
-  assert.equal(s.height, 150);
+  assert.equal(s.height, 101);
   assert.match(s.spineBase, /#112233/);
   assert.match(s.spineBase, /#aa0000/);
   assert.equal(s.finish, 'finish-matte');
@@ -328,7 +328,7 @@ test('bookStyle with bandType "none" draws no band at all', () => {
 test('createBookElement builds the same spine the library shelf shows', () => {
   const { book, style } = T.createBookElement('Trojan War', { width: 'thin' });
   assert.equal(book.style.width, `${style.width}px`);
-  assert.equal(book.querySelector('.book-title').textContent, 'TrojanWar');
+  assert.equal(book.querySelector('.book-title').textContent, style.titleLines.join(''));
 });
 
 test('bookStyle sets length and width independently of each other', () => {
@@ -347,6 +347,49 @@ test('a chosen length is exact even for a long title, which shrinks its font to 
   const short = T.bookStyle(name, { length: 'short' });
   const medium = T.bookStyle(name, { length: 'medium' });
   const tall = T.bookStyle(name, { length: 'tall' });
-  assert.deepEqual([short.height, medium.height, tall.height], [84, 116, 150]);
-  assert.ok(short.fontSize < tall.fontSize, 'the shorter book uses a smaller title font');
+  assert.deepEqual([short.height, medium.height, tall.height], [74, 88, 101]);
+  assert.ok(short.fontSize <= tall.fontSize, 'the shorter book never uses a bigger title font');
+});
+
+test('a chosen width scales the spine title: wider books get bigger text, thinner ones smaller', () => {
+  const name = 'Trojan War';
+  const thin = T.bookStyle(name, { length: 'tall', width: 'thin' });
+  const medium = T.bookStyle(name, { length: 'tall', width: 'medium' });
+  const wide = T.bookStyle(name, { length: 'tall', width: 'wide' });
+  assert.ok(thin.fontSize < medium.fontSize && medium.fontSize < wide.fontSize,
+    `${thin.fontSize} < ${medium.fontSize} < ${wide.fontSize}`);
+  // two lines of the wide title still fit across the 36px spine
+  assert.ok(2 * wide.fontSize * 1.2 <= 36 - 4);
+});
+
+test('a chosen length changes the spine title too: a shorter book shrinks it to fit', () => {
+  const name = 'Cellular Respiration';
+  const short = T.bookStyle(name, { length: 'short', width: 'wide' });
+  const tall = T.bookStyle(name, { length: 'tall', width: 'wide' });
+  assert.ok(short.fontSize < tall.fontSize, `${short.fontSize} < ${tall.fontSize}`);
+});
+
+test('automatic books keep exactly their previous title size', () => {
+  for (const name of ['Trojan War', 'Cellular Respiration', 'Photosynthesis']) {
+    const s = T.bookStyle(name);
+    assert.ok(s.fontSize <= 8 && s.fontSize >= 5.5);
+    assert.deepEqual({ ...T.bookStyle(name, { color: '#112233' }) }.fontSize, s.fontSize, 'colour alone does not change the title size');
+  }
+});
+
+test('a wide book lays its title out on more, shorter lines so the text can be bigger', () => {
+  const name = 'Soul Beliefs 1';
+  const wide = T.bookStyle(name, { length: 'tall', width: 'wide' });
+  const thin = T.bookStyle(name, { length: 'tall', width: 'thin' });
+  assert.ok(wide.titleLines.length > thin.titleLines.length, `${wide.titleLines} vs ${thin.titleLines}`);
+  assert.ok(wide.fontSize > 7, `wide title only ${wide.fontSize}px`);
+  assert.equal(wide.titleLines.join(' '), name, 'no words lost or reordered');
+  // the chosen lines still fit across the spine
+  assert.ok(wide.titleLines.length * wide.fontSize * 1.2 <= wide.width - 4 + 0.01);
+});
+
+test('createBookElement renders the chosen title lines', () => {
+  const { book, style } = T.createBookElement('Soul Beliefs 1', { length: 'tall', width: 'wide' });
+  const span = book.querySelector('.book-title');
+  assert.equal(span.querySelectorAll('br').length, style.titleLines.length - 1);
 });

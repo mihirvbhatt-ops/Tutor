@@ -146,6 +146,29 @@ function splitTitleLines(name) {
   return [trimmed];
 }
 
+// A title laid out on exactly `n` lines (1–3), words balanced by length, or
+// null when it has too few words for that many lines. Used for books with a
+// chosen size, where a wider spine can hold more, shorter lines — see
+// computeSpineStyle. n = 2 is the standard split above.
+function splitTitleInto(name, n) {
+  const trimmed = name.trim();
+  if (n === 1) return [trimmed];
+  if (n === 2) return splitTitleLines(name);
+  const words = trimmed.split(/\s+/);
+  if (words.length < n) return null;
+  const target = trimmed.length / n;
+  const lines = [];
+  let cur = [];
+  words.forEach((w, i) => {
+    const wordsLeft = words.length - i;
+    const linesLeft = n - lines.length;
+    const full = cur.length && ([...cur, w].join(' ').length > target || wordsLeft < linesLeft);
+    if (full && lines.length < n - 1) { lines.push(cur.join(' ')); cur = [w]; } else cur.push(w);
+  });
+  lines.push(cur.join(' '));
+  return lines.length === n ? lines : null;
+}
+
 // The length (in characters) of the longer of a title's rendered lines —
 // used to grow the book (and, as a last resort, shrink its font) for
 // titles that need more room, without affecting titles that fit as-is.
@@ -159,6 +182,9 @@ function longestTitleLine(name) {
 const CHAR_HEIGHT_RATIO = 0.7;
 const DEFAULT_FONT_PX   = 8;
 const MIN_FONT_PX       = 5.5;
+// Across-the-spine space one title line takes, as a multiple of its font
+// size (the spine's default `normal` line height is ~1.2).
+const SPINE_LINE_HEIGHT = 1.2;
 
 // Shared by bookStyle()/courseStyle(): the spine's colour, trim, and title
 // placement, plus its height/width, all derived from per-title hash seeds
@@ -174,8 +200,9 @@ const MIN_FONT_PX       = 5.5;
 // length is exact — the book doesn't grow to fit its title the way an
 // automatic one does (that would make Short/Medium/Tall look identical for
 // most titles); the title's font shrinks to fit instead, as it already does
-// for over-long titles. The values span the automatic range (~64–154px).
-const COVER_LENGTH_PX = { short: 84, medium: 116, tall: 150 };
+// for over-long titles. The original 84 / 116 / 150px stood too tall against
+// the shelves; Medium sits halfway between Short and Tall.
+const COVER_LENGTH_PX = { short: 74, medium: 88, tall: 101 };
 const COVER_WIDTH_PX  = { thin: 18, medium: 26, wide: 36 };
 
 // `cover` (optional, per topic — see normalizeCover in db/sqlite.js) overrides
@@ -207,9 +234,37 @@ function computeSpineStyle(name, { heightBase, widthBase, widthSpan }, cover = n
   const height = customLength
     || Math.min(Math.max(heightBase + jitter, requiredHeight), heightBase + 90);
 
+  const width = COVER_WIDTH_PX[cover.width] || Math.round(widthBase + (hashNum(name, 13) % widthSpan));
+
   const availablePx = height * (titleClear / 100);
-  const fitFontPx   = (availablePx - 4) / (longest * CHAR_HEIGHT_RATIO);
-  const fontSize    = Math.min(DEFAULT_FONT_PX, Math.max(MIN_FONT_PX, fitFontPx));
+  let titleLines = splitTitleLines(name);
+  let fontSize;
+  if (cover.length || cover.width) {
+    // A book with a chosen length or width scales its title with its size.
+    // The width sets the target (the default 8px at Medium width, larger on
+    // a wider spine, smaller on a thinner one); then the title is laid out
+    // on however many lines (1–3) gives the largest text that still fits
+    // both across the spine (lines × line height ≤ width) and down it (the
+    // longest line ≤ the length left clear of the bands).
+    const targetFontPx = DEFAULT_FONT_PX * (width / COVER_WIDTH_PX.medium);
+    let best = null;
+    for (const n of [1, 2, 3]) {
+      const lines = splitTitleInto(name, n);
+      if (!lines) continue;
+      const longestLine = Math.max(...lines.map(l => l.length));
+      const acrossPx = (width - 4) / (n * SPINE_LINE_HEIGHT);
+      const downPx   = (availablePx - 4) / (longestLine * CHAR_HEIGHT_RATIO);
+      const size = Math.min(targetFontPx, acrossPx, downPx);
+      if (!best || size > best.size + 0.01) best = { lines, size };
+    }
+    titleLines = best.lines;
+    fontSize = Math.max(MIN_FONT_PX, best.size);
+  } else {
+    // Automatic books keep the fixed 8px target and standard two-line
+    // split, so they look exactly as before.
+    const fitFontPx = (availablePx - 4) / (longest * CHAR_HEIGHT_RATIO);
+    fontSize = Math.max(MIN_FONT_PX, Math.min(DEFAULT_FONT_PX, fitFontPx));
+  }
 
   // Percentage margins/padding on a physical top/bottom property resolve
   // against the containing block's *width*, not its height (a long-standing
@@ -226,9 +281,10 @@ function computeSpineStyle(name, { heightBase, widthBase, widthSpan }, cover = n
     titleOffsetPx,
     gold,
     titleColor,
+    titleLines,
     fontSize,
     height,
-    width: COVER_WIDTH_PX[cover.width] || Math.round(widthBase + (hashNum(name, 13) % widthSpan)),
+    width,
   };
 }
 
@@ -255,17 +311,16 @@ function spineFont(name) {
 
 // Renders a title as up to two lines (see splitTitleLines()) instead of one
 // long vertical column.
-function setSpineTitle(span, name) {
-  const lines = splitTitleLines(name);
+// `lines` (optional) is a layout already chosen by computeSpineStyle — a
+// book with a chosen size may use 1–3 lines.
+function setSpineTitle(span, name, lines = splitTitleLines(name)) {
   if (lines.length < 2) {
     span.textContent = lines[0];
     return;
   }
-  span.replaceChildren(
-    document.createTextNode(lines[0]),
-    document.createElement('br'),
-    document.createTextNode(lines[1]),
-  );
+  span.replaceChildren(...lines.flatMap((line, i) => (
+    i ? [document.createElement('br'), document.createTextNode(line)] : [document.createTextNode(line)]
+  )));
 }
 
 // Applies a computeSpineStyle() result's finish class plus spineFont() to a
@@ -303,7 +358,7 @@ function createBookElement(name, cover) {
   `;
   const span = document.createElement('span');
   span.className = 'book-title';
-  setSpineTitle(span, name);
+  setSpineTitle(span, name, style.titleLines);
   applySpineStyle(book, span, name, style);
   book.appendChild(span);
   return { book, style };
