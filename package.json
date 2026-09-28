@@ -6,7 +6,7 @@
   "author": "Mihir Bhatt",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OWNER/REPO.git"
+    "url": "git+https://github.com/mihirvbhatt-ops/Tutor.git"
   },
   "type": "module",
   "main": "server.js",

@@ -219,15 +219,31 @@ test('GET /api/fonts returns an array', async () => {
 });
 
 // ── #4 — packaged installer & update mechanism ──────────────────────────────
-// package.json's repository.url still carries the OWNER/REPO placeholder in
-// this checkout, so the endpoint must report itself as unconfigured rather
-// than querying GitHub for a repo that doesn't exist.
-test('GET /api/update-check reports unconfigured against the placeholder repository URL', async () => {
-  const res = await get('/api/update-check');
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.configured, false);
-  assert.equal(typeof body.currentVersion, 'string');
+// package.json points at the real GitHub repo, so the endpoint queries its
+// latest release. The GitHub call is intercepted here (the server runs in
+// this process) so the test never depends on the network or GitHub's rate
+// limit; requests to the local test server pass through untouched.
+test('GET /api/update-check compares the latest GitHub release with package.json\'s version', async () => {
+  const realFetch = globalThis.fetch;
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  let githubUrl = null;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).startsWith('https://api.github.com/')) {
+      githubUrl = String(url);
+      return new Response(JSON.stringify({ tag_name: 'v999.0.0', html_url: 'https://github.com/example/release' }), { status: 200 });
+    }
+    return realFetch(url, opts);
+  };
+  try {
+    const body = await (await get('/api/update-check')).json();
+    assert.equal(githubUrl, 'https://api.github.com/repos/mihirvbhatt-ops/Tutor/releases/latest');
+    assert.equal(body.configured, true);
+    assert.equal(body.currentVersion, pkg.version);
+    assert.equal(body.latestVersion, '999.0.0');
+    assert.equal(body.updateAvailable, true);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 // ── #6/#7 — session-summary comparisons never include the in-progress run ──
