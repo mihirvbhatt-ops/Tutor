@@ -35,15 +35,20 @@ function splitSentences(content) {
 // lowercase-conventioned technical vocabulary (property, staticmethod, and
 // the like). GENERIC_LEAD_WORDS and (for copula sentences) the recurrence
 // check below still filter out ordinary lowercase prose leads.
-const TERM = `[A-Za-z][A-Za-z0-9'’\\-]*(?:\\s+[A-Za-z0-9'’\\-]+){0,${MAX_TERM_WORDS - 1}}`;
+// Unicode letters (Psychē), en/em dashes (Mind–body), slashes ("Agency /
+// agency detection"), parentheses ("Nous (intellect)") and footnote markers
+// ("Animism †") all show up in real study-guide term names and used to make
+// the whole line silently unmatchable.
+const TERM_CHAR = `\\p{L}\\p{N}'’\\-–—/()†‡*`;
+const TERM = `\\p{L}[${TERM_CHAR}]*(?:\\s+[${TERM_CHAR}]+){0,${MAX_TERM_WORDS - 1}}`;
 
-const GLOSSARY_LINE_RE = new RegExp(`^(${TERM}):\\s+(.{${MIN_DEFINITION_LEN},${MAX_DEFINITION_LEN}})$`);
+const GLOSSARY_LINE_RE = new RegExp(`^(${TERM}):\\s+(.{${MIN_DEFINITION_LEN},${MAX_DEFINITION_LEN}})$`, 'u');
 // roadmap #8 — past-tense counterparts (was/were/referred to/meant/was
 // defined as/was known as) alongside the existing present-tense copulas, so
 // narrative/historical material phrased in the past isn't silently skipped.
 const COPULA_RE = new RegExp(
   `^(${TERM})\\s+(?:is|was|are|were|refers to|referred to|means|meant|is defined as|was defined as|is known as|was known as)\\s+(.{${MIN_DEFINITION_LEN},${MAX_DEFINITION_LEN}}?)\\.?$`,
-  'i'
+  'iu'
 );
 
 // Cheap fast-path rejection: sentence-initial capitalization makes ordinary
@@ -68,13 +73,26 @@ function cleanDefinition(def) {
   return def.trim().replace(/\.$/, '');
 }
 
+// A trailing footnote marker ("Animism †") flags the entry, it isn't part of
+// the term a flashcard should ask about.
+function cleanTerm(term) {
+  return term.trim().replace(/[\s†‡*]+$/u, '');
+}
+
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Whole-word match for `term`. `\b` is ASCII-only and needs a word character
+// on the inside edge, so it never matched terms like "Psychē" or
+// "Nous (intellect)" — use Unicode-aware lookarounds instead.
+function wholeWordRe(term) {
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegex(term)}(?![\\p{L}\\p{N}])`, 'iu');
+}
+
 // Whole-word search for `term` in a sentence other than `ownSentence`.
 function findOtherMention(term, ownSentence, sentences) {
-  const re = new RegExp(`\\b${escapeRegex(term)}\\b`, 'i');
+  const re = wholeWordRe(term);
   return sentences.find(s => s !== ownSentence && re.test(s));
 }
 
@@ -89,7 +107,8 @@ export function extractTerms(content) {
     const line = rawLine.trim();
     const m = GLOSSARY_LINE_RE.exec(line);
     if (!m) continue;
-    const term = m[1].trim();
+    const term = cleanTerm(m[1]);
+    if (!term) continue;
     const key = term.toLowerCase();
     if (seen.has(key) || isGenericLead(term)) continue;
     const words = term.split(/\s+/).length;
@@ -103,7 +122,8 @@ export function extractTerms(content) {
   for (const sentence of sentences) {
     const m = COPULA_RE.exec(sentence);
     if (!m) continue;
-    const term = m[1].trim();
+    const term = cleanTerm(m[1]);
+    if (!term) continue;
     const key = term.toLowerCase();
     if (seen.has(key) || isGenericLead(term)) continue;
     // Sentence-initial capitalization alone can't tell a real proper noun
@@ -129,7 +149,7 @@ export function extractCloze(content, terms) {
   for (const { term, sourceSentence } of terms) {
     const hit = findOtherMention(term, sourceSentence, sentences);
     if (!hit) continue;
-    const wordRe = new RegExp(`\\b${escapeRegex(term)}\\b`, 'i');
+    const wordRe = wholeWordRe(term);
     clozes.push({ term, clozeText: hit.replace(wordRe, CLOZE_BLANK) });
   }
 

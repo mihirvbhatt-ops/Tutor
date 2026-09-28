@@ -100,6 +100,19 @@ test('synthesizePptxSlide keeps a second title-placeholder shape as its own line
   assert.equal(out, 'Achilles: Nearly invincible except for his heel.\nGreatest Greek Warrior.');
 });
 
+test('synthesizePptxSlide turns indented sub-bullets under each term bullet into one "Term: definition" line per term', () => {
+  const para = (lvl, t) => `<a:p>${lvl ? `<a:pPr lvl="${lvl}"/>` : ''}<a:r><a:t>${t}</a:t></a:r></a:p>`;
+  const xml = `<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+    <p:cSld><p:spTree>
+      <p:sp><p:nvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>
+        <p:txBody><a:p><a:r><a:t>Key terms</a:t></a:r></a:p></p:txBody></p:sp>
+      <p:sp><p:nvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>
+        <p:txBody>${para(0, 'Achilles')}${para(1, 'Greatest Greek warrior')}${para(1, 'Weak heel')}${para(0, 'Hector')}${para(1, 'Greatest Trojan warrior')}</p:txBody></p:sp>
+    </p:spTree></p:cSld></p:sld>`;
+  const out = synthesizePptxSlide(xml);
+  assert.equal(out, 'Key terms.\nAchilles: Greatest Greek warrior; Weak heel.\nHector: Greatest Trojan warrior.');
+});
+
 test('synthesizePptxSlide returns empty string for a slide with no extractable text (pure image)', () => {
   const xml = `<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:pic/></p:spTree></p:cSld></p:sld>`;
   assert.equal(synthesizePptxSlide(xml), '');
@@ -128,6 +141,46 @@ test('synthesizeDocxHtml treats bullet-list items after a heading as body conten
   const html = '<h1>Achilles</h1><ul><li>Greatest Greek warrior</li><li>Nearly invincible except for his heel</li></ul>';
   const out = synthesizeDocxHtml(html);
   assert.equal(out, 'Achilles: Greatest Greek warrior Nearly invincible except for his heel.');
+});
+
+test('synthesizeDocxHtml turns a nested bullet list (term bullet + sub-bullets) into one "Term: definition" line per term', () => {
+  const html =
+    '<h2>Part 1</h2><ul>' +
+    '<li><strong>Achilles</strong><ul><li>Greatest Greek warrior</li><li>Weak heel</li></ul></li>' +
+    '<li><strong>Hector</strong><ul><li>Greatest Trojan warrior</li></ul></li>' +
+    '<li><strong>Tripartite soul</strong><ul><li><strong>Three parts:</strong><ul><li>Reason</li><li>Appetite</li></ul></li></ul></li>' +
+    '</ul>';
+  const out = synthesizeDocxHtml(html);
+  assert.equal(
+    out,
+    'Part 1.\nAchilles: Greatest Greek warrior; Weak heel.\nHector: Greatest Trojan warrior.\nTripartite soul: Three parts: Reason; Appetite.'
+  );
+});
+
+test('synthesizeDocxHtml gives a bold sub-term with its own sub-bullets a separate line instead of folding it into its parent', () => {
+  const html =
+    '<ul><li><strong>Ancient Egypt</strong><ul>' +
+    '<li>Body, ba and ka</li>' +
+    '<li><strong>Ba soul</strong><ul><li>Unique personality</li><li>Recites the declarations</li></ul></li>' +
+    '<li><strong>Ka soul</strong><ul><li>Universal life force</li></ul></li>' +
+    '</ul></li></ul>';
+  const out = synthesizeDocxHtml(html);
+  assert.equal(
+    out,
+    'Ancient Egypt: Body, ba and ka.\nBa soul: Unique personality; Recites the declarations.\nKa soul: Universal life force.'
+  );
+});
+
+test('synthesizeDocxHtml splits a flat list of bold-term bullets ("Term – definition") into one line per term', () => {
+  const html = '<h1>Greeks</h1><ul><li><strong>Achilles</strong> – Greatest Greek warrior</li><li><strong>Hector:</strong> Greatest Trojan warrior</li></ul>';
+  const out = synthesizeDocxHtml(html);
+  assert.equal(out, 'Greeks.\nAchilles: Greatest Greek warrior.\nHector: Greatest Trojan warrior.');
+});
+
+test('synthesizeDocxHtml splits bold-term paragraphs but leaves a paragraph that merely opens in bold alone', () => {
+  const html = '<h1>Achilles</h1><p><strong>Born</strong> in Phthia to Peleus and Thetis.</p><p><strong>Hector</strong> — Greatest Trojan warrior</p>';
+  const out = synthesizeDocxHtml(html);
+  assert.equal(out, 'Achilles: Born in Phthia to Peleus and Thetis.\nHector: Greatest Trojan warrior.');
 });
 
 test('synthesizeDocxHtml keeps document order when a table sits between two heading+paragraph pairs', () => {
