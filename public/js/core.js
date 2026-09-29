@@ -53,7 +53,12 @@ function positionPopoverNear(el, triggerEl) {
 async function toResultOrThrow(r) {
   let data;
   try { data = await r.json(); } catch { data = {}; }
-  if (!r.ok) throw new Error(data.error || `Request failed (${r.status})`);
+  if (!r.ok) {
+    const err = new Error(data.error || `Request failed (${r.status})`);
+    err.status = r.status;
+    err.code = data.code;
+    throw err;
+  }
   return data;
 }
 const getJson = (url, signal) => fetch(url, { signal }).then(toResultOrThrow);
@@ -246,8 +251,55 @@ async function startStudySession(topicId, mode) {
 function recordSessionAnswer(correct, timeMs = null, questionText = '') {
   sessionAnswers.push({ question: questionText, correct });
   if (!activeStudySessionId) return;
+  const id = activeStudySessionId;
   const t = timeMs != null ? timeMs : (questionShownAt ? Date.now() - questionShownAt : 0);
-  patchReq(`/api/sessions/${activeStudySessionId}`, { correct, timeMs: t }).catch(()=>{});
+  patchReq(`/api/sessions/${id}`, { correct, timeMs: t }).catch(err => {
+    if (err.code === 'SESSION_NOT_FOUND') onSessionGone(id);
+  });
+}
+
+// ── Terminated sessions ──────────────────────────────────────────────────────
+// A quiz/deck's session can be deleted out from under it (Stats page 🗑, or
+// another window). The open panel used to carry on regardless — answers went
+// nowhere and the run fell apart — so it now switches to a "Study session
+// terminated" screen instead (see renderSessionTerminated in study.js).
+const TERMINATED_FLAG = { quiz: 'quizTerminated', flashcard: 'flashTerminated' };
+
+// Flags every open tab whose quiz or deck ran on `sessionId`. The active
+// tab's live session is in activeStudySessionId until it's snapshotted, so
+// check that too.
+function markSessionTerminated(sessionId) {
+  if (!sessionId) return false;
+  let hit = false;
+  for (const t of studyTabs) {
+    if (t.quizSessionId === sessionId) { t.quizTerminated = true; hit = true; }
+    if (t.flashSessionId === sessionId) { t.flashTerminated = true; hit = true; }
+  }
+  const active = getActiveTab();
+  if (active && activeStudySessionId === sessionId && TERMINATED_FLAG[active.mode]) {
+    active[TERMINATED_FLAG[active.mode]] = true;
+    hit = true;
+  }
+  if (activeStudySessionId === sessionId) activeStudySessionId = null; // stop recording into it
+  return hit;
+}
+
+// Marks the session gone and, if its panel is the one on screen, shows the
+// terminated screen right away.
+function onSessionGone(sessionId) {
+  if (!markSessionTerminated(sessionId)) return;
+  const tab = getActiveTab();
+  if (tab && tab[TERMINATED_FLAG[tab.mode]] && activeView === 'study') renderSessionTerminated(tab, tab.mode);
+}
+
+// When an open quiz/deck is shown again, confirm its session still exists.
+function verifyTabSession(tab, mode) {
+  const id = mode === 'quiz' ? tab.quizSessionId : mode === 'flashcard' ? tab.flashSessionId : null;
+  const liveId = tab.id === activeTabId ? (activeStudySessionId || id) : id;
+  if (!liveId) return;
+  getJson(`/api/sessions/${liveId}`).catch(err => {
+    if (err.code === 'SESSION_NOT_FOUND') onSessionGone(liveId);
+  });
 }
 
 // Builds the end-of-session summary HTML: accuracy this run vs. last time for
@@ -653,12 +705,13 @@ function ensureModeLoaded(tab, mode) {
     loadExplainPanel(tab.topicId);
     return;
   }
+  if (TERMINATED_FLAG[mode] && tab[TERMINATED_FLAG[mode]]) { renderSessionTerminated(tab, mode); return; }
   if (mode === 'quiz') {
-    if (tab.quizLoaded) { renderQuizQuestion(); } else { tab.quizLoaded = true; loadQuizPanel(tab.topicId); }
+    if (tab.quizLoaded) { renderQuizQuestion(); verifyTabSession(tab, mode); } else { tab.quizLoaded = true; loadQuizPanel(tab.topicId); }
     return;
   }
   if (mode === 'flashcard') {
-    if (tab.flashLoaded) { renderFlashCard(); } else { tab.flashLoaded = true; loadFlashPanel(tab.topicId); }
+    if (tab.flashLoaded) { renderFlashCard(); verifyTabSession(tab, mode); } else { tab.flashLoaded = true; loadFlashPanel(tab.topicId); }
   }
 }
 
@@ -847,6 +900,14 @@ function showView(name) {
   if (name === 'settings') syncSettingsUI();
   if (name === 'stats') renderStats();
   if (name === 'study' && !getActiveTab()) renderStudyTabsBar();
+  // Returning to Study doesn't re-render the panel, so a quiz/deck whose
+  // session was deleted meanwhile (e.g. from the Stats page) is switched to
+  // the terminated screen here — or checked with the server if not yet known.
+  const active = name === 'study' ? getActiveTab() : null;
+  if (active && TERMINATED_FLAG[active.mode]) {
+    if (active[TERMINATED_FLAG[active.mode]]) renderSessionTerminated(active, active.mode);
+    else verifyTabSession(active, active.mode);
+  }
 }
 
 navBtns.forEach(btn => btn.addEventListener('click', () => showView(btn.dataset.view)));

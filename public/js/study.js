@@ -339,6 +339,47 @@ async function recordAndAdvanceFlash(correct) {
 get('btn-flash-right').addEventListener('click', () => recordAndAdvanceFlash(true));
 get('btn-flash-wrong').addEventListener('click', () => recordAndAdvanceFlash(false));
 
+// Shown in place of a quiz/deck whose session was deleted (see
+// markSessionTerminated in core.js): answers can no longer be recorded, so
+// rather than carry on in a broken state the run ends here.
+function renderSessionTerminated(tab, mode) {
+  const isQuiz = mode === 'quiz';
+  const label  = isQuiz ? 'quiz' : 'flashcard';
+  if (isQuiz) {
+    freezeQuizClock();
+    get('quiz-card').classList.add('hidden');
+    get('panel-quiz').querySelector('.quiz-top').classList.add('hidden');
+  } else {
+    get('flash-card-scene').classList.add('hidden');
+    get('flash-nav')?.classList.add('hidden');
+    get('panel-flashcard').querySelector('.flash-top').classList.add('hidden');
+  }
+  get(`${isQuiz ? 'quiz' : 'flash'}-gen-empty`).classList.add('hidden');
+  const wrap = get(isQuiz ? 'quiz-summary-wrap' : 'flash-summary-wrap');
+  wrap.classList.remove('hidden');
+  wrap.innerHTML = `
+    <div class="session-terminated empty-tab-prompt">
+      <div class="empty-glyph">⏹</div>
+      <p class="empty-title">Study session terminated</p>
+      <p class="hint">This ${label} session was deleted from your stats, so answers here can't be recorded any more.</p>
+      <div class="empty-tab-actions">
+        <button class="primary-btn" id="btn-terminated-restart">Start over</button>
+        <button class="ghost-btn" id="btn-terminated-close">Close tab</button>
+      </div>
+    </div>`;
+  get('btn-terminated-restart').addEventListener('click', () => {
+    tab[TERMINATED_FLAG[mode]] = false;
+    if (isQuiz) Object.assign(tab, { quizLoaded: false, quizQs: [], quizIdx: 0, quizSessionId: null, quizAnswers: [], quizSummaryHtml: null });
+    else        Object.assign(tab, { flashLoaded: false, flashQs: [], flashIdx: 0, flashSessionId: null, flashAnswers: [], flashSummaryHtml: null });
+    activeStudySessionId = null;
+    if (tab.topicId) del(`/api/session-progress/${tab.topicId}/${mode}`).catch(()=>{});
+    wrap.classList.add('hidden');
+    restoreMode(tab, mode);
+    ensureModeLoaded(tab, mode);  // loads from question 1 with a fresh session
+  });
+  get('btn-terminated-close').addEventListener('click', () => closeStudyTab(tab.id));
+}
+
 // The quiz and flashcard panels are shared by every study tab, so the
 // "No questions yet — generate" chooser has to be hidden explicitly whenever
 // a tab with questions renders into the panel. Only the first-load path used

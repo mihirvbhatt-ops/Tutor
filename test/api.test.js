@@ -251,6 +251,23 @@ test('GET /api/update-check compares the latest GitHub release with package.json
 // hasn't been ended yet can never be picked up as "last time" — the bug this
 // guards against is comparing a run's own not-yet-closed row against itself.
 
+test('a deleted session reports 404 to lookups and to answers recorded against it', async () => {
+  const topic = seedTopic('Terminated Session Topic');
+  const s = await (await post('/api/sessions/start', { topicId: topic.id, mode: 'quiz' })).json();
+
+  assert.equal((await get(`/api/sessions/${s.id}`)).status, 200);
+  assert.equal((await patch(`/api/sessions/${s.id}`, { correct: true, timeMs: 10 })).status, 200);
+
+  await fetch(`${base}/api/sessions/${s.id}`, { method: 'DELETE' });
+  const lookup = await get(`/api/sessions/${s.id}`);
+  assert.equal(lookup.status, 404);
+  assert.equal((await lookup.json()).code, 'SESSION_NOT_FOUND');
+  assert.equal((await patch(`/api/sessions/${s.id}`, { correct: true, timeMs: 10 })).status, 404);
+
+  // /summary is not swallowed by the new /:id route
+  assert.equal((await get('/api/sessions/summary')).status, 200);
+});
+
 test('an in-progress session never appears in the "last session" comparison list', async () => {
   const topic = seedTopic('Self Comparison Topic');
 

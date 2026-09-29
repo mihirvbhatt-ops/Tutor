@@ -67,6 +67,9 @@ async function renderStats() {
       btn.disabled = true;
       try {
         await del(`/api/sessions/${btn.dataset.sessionId}`);
+        // An open quiz/deck still running on this session shows "Study
+        // session terminated" when you go back to it.
+        markSessionTerminated(btn.dataset.sessionId);
         renderStats();
       } catch {
         btn.disabled = false;

@@ -32,7 +32,7 @@ import {
   createCourse, listCourses, getCourse, deleteCourse, getCourseStats,
   addTopicToCourse, removeTopicFromCourse, reorderCourseTopics,
   saveProgress, getProgress, clearProgress,
-  startSession, recordSessionAnswer, endSession, deleteSession, listSessions, getStatsSummary,
+  startSession, getSession, recordSessionAnswer, endSession, deleteSession, listSessions, getStatsSummary,
   saveExplanation, getExplanation,
   saveSearchCache, listSearchCacheQueries, getSearchCache,
   exportAll, exportDbSnapshot
@@ -1049,7 +1049,11 @@ app.post('/api/sessions/start', (req, res) => {
   if (!topicId || !mode) return res.status(400).json({ error: 'topicId and mode are required' });
   res.json(startSession(topicId, mode));
 });
+// A session deleted from the Stats page while its quiz/deck is still open
+// used to accept answers silently (the UPDATE just matched no row), so the
+// open panel never learned its run had been terminated. 404 tells it.
 app.patch('/api/sessions/:id', (req, res) => {
+  if (!getSession(req.params.id)) return res.status(404).json({ error: 'Session not found', code: 'SESSION_NOT_FOUND' });
   const { correct, timeMs } = req.body;
   res.json(recordSessionAnswer(req.params.id, !!correct, timeMs));
 });
@@ -1060,6 +1064,12 @@ app.get('/api/sessions', (req, res) => {
   res.json(listSessions({ topicId: topicId || null, mode: mode || null, limit: limit ? parseInt(limit, 10) : null }));
 });
 app.get('/api/sessions/summary', (req, res) => res.json(getStatsSummary()));
+// Declared after /summary so that path isn't captured as an id. Lets an open
+// quiz/deck check its session still exists when it's shown again.
+app.get('/api/sessions/:id', (req, res) => {
+  const s = getSession(req.params.id);
+  s ? res.json(s) : res.status(404).json({ error: 'Session not found', code: 'SESSION_NOT_FOUND' });
+});
 
 // ── Font discovery ────────────────────────────────────────────────────────────
 // Drop any .woff2 / .woff / .ttf / .otf into public/fonts/ and they appear

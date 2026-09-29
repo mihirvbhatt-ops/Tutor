@@ -835,6 +835,10 @@ export function startSession(topicId, mode) {
   return { id, topicId, mode, startedAt };
 }
 
+export function getSession(sessionId) {
+  return query(`SELECT * FROM sessions WHERE id = ?`, [sessionId])[0] || null;
+}
+
 export function recordSessionAnswer(sessionId, correct, timeMs = 0) {
   run(`UPDATE sessions
        SET questionsAnswered = questionsAnswered + 1,
