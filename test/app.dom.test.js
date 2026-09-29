@@ -48,7 +48,12 @@ before(() => {
 window.__T = {
   esc, markdownToHtml, formatClock, quizClockElapsedMs, computeSpineStyle,
   statBarRow, fmtCount, wizardGenBody, countsFromInputs, loadExplainPanel, addExplainModeIfAvailable,
-  bookStyle, createBookElement
+  bookStyle, createBookElement,
+  renderFlashCard, stepFlash, recordAndAdvanceFlash,
+  // flashQs/flashIdx/sessionAnswers are top-level \`let\`s — reachable only
+  // from inside this same script scope.
+  setFlashDeck: (qs, idx = 0) => { flashQs = qs; flashIdx = idx; sessionAnswers = []; currentTopic = null; },
+  flashState: () => ({ idx: flashIdx, answers: sessionAnswers.map(a => ({ ...a })) })
 };`;
   win.eval(appJs + '\n' + trailer);
   T = win.__T;
@@ -392,4 +397,66 @@ test('createBookElement renders the chosen title lines', () => {
   const { book, style } = T.createBookElement('Soul Beliefs 1', { length: 'tall', width: 'wide' });
   const span = book.querySelector('.book-title');
   assert.equal(span.querySelectorAll('br').length, style.titleLines.length - 1);
+});
+
+// ── Flashcards: Previous / Next ─────────────────────────────────────────────
+
+const DECK = [
+  { id: 'q1', question: 'Alpha', answer: 'first' },
+  { id: 'q2', question: 'Beta', answer: 'second' },
+  { id: 'q3', question: 'Gamma', answer: 'third' }
+];
+
+test('Previous / Next step through the deck without recording answers, and stop at each end', async () => {
+  stubFetch({});
+  const doc = win.document;
+  T.setFlashDeck(DECK);
+  await T.renderFlashCard();
+  assert.equal(doc.getElementById('flash-front').textContent, 'Alpha');
+  assert.equal(doc.getElementById('btn-flash-prev').disabled, true);
+
+  doc.getElementById('btn-flash-next').click();
+  assert.equal(doc.getElementById('flash-counter').textContent, '2 / 3');
+  assert.equal(doc.getElementById('flash-front').textContent, 'Beta');
+  assert.equal(doc.getElementById('btn-flash-prev').disabled, false);
+
+  doc.getElementById('btn-flash-next').click();
+  assert.equal(doc.getElementById('btn-flash-next').disabled, true, 'Next stops at the last card');
+  T.stepFlash(1);
+  assert.equal(T.flashState().idx, 2, 'no stepping past the end');
+
+  doc.getElementById('btn-flash-prev').click();
+  assert.equal(doc.getElementById('flash-front').textContent, 'Beta');
+  assert.equal(doc.getElementById('flashcard').classList.contains('flipped'), false, 'opens question-side up');
+  assert.equal(T.flashState().answers.length, 0, 'navigating records nothing');
+});
+
+test('arrow keys move through the deck while the flashcard panel is showing', async () => {
+  stubFetch({});
+  const doc = win.document;
+  T.setFlashDeck(DECK);
+  await T.renderFlashCard();
+  doc.getElementById('view-study').classList.add('active');
+  doc.getElementById('panel-flashcard').classList.add('active');
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  assert.equal(T.flashState().idx, 1);
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+  assert.equal(T.flashState().idx, 0);
+  doc.getElementById('panel-flashcard').classList.remove('active');
+  doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  assert.equal(T.flashState().idx, 0, 'ignored when the flashcard panel is not showing');
+});
+
+test('re-answering a card after going back replaces its answer instead of counting it twice', async () => {
+  const calls = stubFetch({ '/api/record-attempt': [200, { ok: true }] });
+  T.setFlashDeck(DECK);
+  await T.renderFlashCard();
+  await T.recordAndAdvanceFlash(false);          // Alpha: missed
+  T.stepFlash(-1);                               // back to Alpha
+  await T.recordAndAdvanceFlash(true);           // Alpha: got it
+  const { answers, idx } = T.flashState();
+  assert.equal(idx, 1);
+  assert.equal(answers.length, 1);
+  assert.equal(answers[0].correct, true);
+  assert.equal(calls.filter(u => u === '/api/record-attempt').length, 2, 'both attempts still go to the history');
 });

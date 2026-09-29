@@ -528,6 +528,15 @@ a.ghost-btn{display:inline-block;text-decoration:none;text-align:center}
 }
 .vbtn.wrong{background:rgba(224,85,85,.1);border-color:var(--red);color:var(--red)}
 .vbtn.right{background:rgba(52,201,122,.1);border-color:var(--green);color:var(--green)}
+/* Previous / Next through the deck — quieter than the verdict buttons so
+   they don't read as answers. */
+.flash-nav{display:flex;justify-content:space-between;gap:10px;margin-top:14px}
+.flash-nav-btn{
+  flex:1;max-width:180px;padding:10px 14px;border-radius:10px;font-size:.88rem;
+  background:var(--bg2);border:1px solid var(--border);color:var(--ink);
+}
+.flash-nav-btn:hover:not(:disabled){border-color:var(--accent2);color:var(--accent)}
+.flash-nav-btn:disabled{opacity:.35;cursor:default}
 
 /* Quiz */
 .quiz-card{

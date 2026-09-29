@@ -197,6 +197,7 @@ async function loadFlashPanel(topicId) {
 
   if (!flashQs.length) {
     get('flash-card-scene').classList.add('hidden');
+    get('flash-nav').classList.add('hidden');
     get('flash-summary-wrap').classList.add('hidden');
     setGenChooserVisible('flashcard', true);
     renderPanelGenChooser(get('flash-gen-empty'), {
@@ -238,6 +239,7 @@ async function renderFlashCard() {
     const topicId = currentTopic.id;
     const tab = getActiveTab();
     get('flash-card-scene').classList.add('hidden');
+    get('flash-nav').classList.add('hidden');
     const wrap = get('flash-summary-wrap');
     wrap.classList.remove('hidden');
     // Cache the summary the first time it's built so revisiting this tab
@@ -259,6 +261,7 @@ async function renderFlashCard() {
     return;
   }
   get('flash-card-scene').classList.remove('hidden');
+  get('flash-nav').classList.remove('hidden');
   get('flash-summary-wrap').classList.add('hidden');
   const q  = flashQs[flashIdx];
   const pct = Math.round((flashIdx / flashQs.length) * 100);
@@ -267,8 +270,41 @@ async function renderFlashCard() {
   get('flash-front').textContent   = q.question;
   get('flash-back').textContent    = q.answer;
   get('flashcard').classList.remove('flipped');
+  // Next stops at the last card: the deck is finished by answering it (Got
+  // it / Missed it), which is what ends the session and shows the summary.
+  get('btn-flash-prev').disabled = flashIdx === 0;
+  get('btn-flash-next').disabled = flashIdx >= flashQs.length - 1;
   questionShownAt = Date.now();
 }
+
+function saveFlashPosition() {
+  if (!currentTopic) return;
+  post('/api/session-progress', { topicId: currentTopic.id, mode: 'flashcard', currentIndex: flashIdx }).catch(()=>{});
+}
+
+// Previous / Next move through the deck without recording an answer — the
+// card always opens question-side up, and the position is saved so the deck
+// resumes there.
+function stepFlash(delta) {
+  const target = flashIdx + delta;
+  if (!flashQs.length || target < 0 || target > flashQs.length - 1) return;
+  flashIdx = target;
+  saveFlashPosition();
+  renderFlashCard();
+}
+get('btn-flash-prev').addEventListener('click', () => stepFlash(-1));
+get('btn-flash-next').addEventListener('click', () => stepFlash(1));
+
+// ← / → do the same while the flashcard deck is the panel on screen (not
+// while typing in a field, and not on the summary or generate screens).
+document.addEventListener('keydown', e => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  if (e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+  if (!get('panel-flashcard').classList.contains('active') || get('flash-nav').classList.contains('hidden')) return;
+  if (!get('view-study')?.classList.contains('active')) return;
+  e.preventDefault();
+  stepFlash(e.key === 'ArrowLeft' ? -1 : 1);
+});
 
 get('btn-reveal').addEventListener('click', () => get('flashcard').classList.add('flipped'));
 
@@ -280,13 +316,22 @@ async function recordAndAdvanceFlash(correct) {
   const timeMs = questionShownAt ? Date.now() - questionShownAt : 0;
   const q = flashQs[flashIdx];
   await post('/api/record-attempt', { questionId: q.id, correct });
-  recordSessionAnswer(correct, timeMs, q.question);
+  // Going back (Previous) to a card already answered this run and answering
+  // it again replaces that answer in this run's tally instead of counting
+  // the card twice; the attempt history above still keeps every answer.
+  const earlier = sessionAnswers.find(a => a.questionId === q.id);
+  if (earlier) {
+    earlier.correct = correct;
+  } else {
+    recordSessionAnswer(correct, timeMs, q.question);
+    sessionAnswers[sessionAnswers.length - 1].questionId = q.id;
+  }
   flashIdx++;
   if (currentTopic) {
     if (flashIdx >= flashQs.length) {
       del(`/api/session-progress/${currentTopic.id}/flashcard`).catch(()=>{});
     } else {
-      post('/api/session-progress', { topicId: currentTopic.id, mode: 'flashcard', currentIndex: flashIdx }).catch(()=>{});
+      saveFlashPosition();
     }
   }
   renderFlashCard();
