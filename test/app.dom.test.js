@@ -48,7 +48,11 @@ before(() => {
 window.__T = {
   esc, markdownToHtml, formatClock, quizClockElapsedMs, computeSpineStyle,
   statBarRow, fmtCount, wizardGenBody, countsFromInputs, loadExplainPanel, addExplainModeIfAvailable,
-  bookStyle, createBookElement
+  bookStyle, createBookElement,
+  markSessionTerminated, ensureModeLoaded,
+  // studyTabs / activeTabId / activeStudySessionId are top-level \`let\`s.
+  setStudyTabs: (tabs, activeId, liveSessionId) => { studyTabs = tabs; activeTabId = activeId; activeStudySessionId = liveSessionId; },
+  liveSessionId: () => activeStudySessionId
 };`;
   win.eval(appJs + '\n' + trailer);
   T = win.__T;
@@ -392,4 +396,34 @@ test('createBookElement renders the chosen title lines', () => {
   const { book, style } = T.createBookElement('Soul Beliefs 1', { length: 'tall', width: 'wide' });
   const span = book.querySelector('.book-title');
   assert.equal(span.querySelectorAll('br').length, style.titleLines.length - 1);
+});
+
+// ── Terminated study sessions ───────────────────────────────────────────────
+
+test('deleting a session flags the open tab running it, and its panel shows "Study session terminated"', () => {
+  const quizTab = { id: 'tq', topicId: 't1', mode: 'quiz', quizSessionId: 'sQ', flashSessionId: null, quizLoaded: true };
+  const otherTab = { id: 'to', topicId: 't2', mode: 'quiz', quizSessionId: 'sOther', flashSessionId: null, quizLoaded: true };
+  T.setStudyTabs([quizTab, otherTab], 'tq', 'sQ');
+
+  assert.equal(T.markSessionTerminated('sQ'), true);
+  assert.equal(quizTab.quizTerminated, true);
+  assert.equal(otherTab.quizTerminated, undefined, 'other tabs are untouched');
+  assert.equal(T.liveSessionId(), null, 'stops recording into the deleted session');
+  assert.equal(T.markSessionTerminated('not-open-anywhere'), false);
+
+  T.ensureModeLoaded(quizTab, 'quiz');
+  const doc = win.document;
+  assert.match(doc.getElementById('quiz-summary-wrap').textContent, /Study session terminated/);
+  assert.equal(doc.getElementById('quiz-card').classList.contains('hidden'), true);
+  assert.ok(doc.getElementById('btn-terminated-restart'));
+  assert.ok(doc.getElementById('btn-terminated-close'));
+});
+
+test('a flashcard deck whose session was deleted shows the terminated screen too', () => {
+  const tab = { id: 'tf', topicId: 't3', mode: 'flashcard', quizSessionId: null, flashSessionId: 'sF', flashLoaded: true };
+  T.setStudyTabs([tab], 'tf', null);
+  T.markSessionTerminated('sF');
+  T.ensureModeLoaded(tab, 'flashcard');
+  assert.match(win.document.getElementById('flash-summary-wrap').textContent, /Study session terminated/);
+  assert.equal(win.document.getElementById('flash-card-scene').classList.contains('hidden'), true);
 });
