@@ -33,8 +33,11 @@ let server, base;
 before(async () => {
   await initDb();
   server = http.createServer(app);
-  await new Promise(resolve => server.listen(0, resolve));
-  base = `http://localhost:${server.address().port}`;
+  // Explicit IPv4 loopback rather than "localhost", which on Windows
+  // resolves to both ::1 and 127.0.0.1 and goes through name resolution
+  // on every request.
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  base = `http://127.0.0.1:${server.address().port}`;
 });
 
 after(async () => {
@@ -44,10 +47,16 @@ after(async () => {
   fs.rmSync(TEST_CONFIG, { force: true });
 });
 
-const get   = p        => fetch(base + p);
-const post  = (p, b)   => fetch(base + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
-const patch = (p, b)   => fetch(base + p, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
-const del   = p        => fetch(base + p, { method: 'DELETE' });
+// Every request here is against an in-process server and finishes in
+// milliseconds. Without a timeout, a request that stalls on a CI runner
+// (seen once on windows-latest) sits until undici's 300s headers timeout
+// and then fails with a bare "fetch failed". Fail fast and say why instead.
+const REQUEST_TIMEOUT_MS = 15_000;
+const req   = (p, init = {}) => fetch(base + p, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+const get   = p        => req(p);
+const post  = (p, b)   => req(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
+const patch = (p, b)   => req(p, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
+const del   = p        => req(p, { method: 'DELETE' });
 
 function seedTopic(name = 'Photosynthesis') {
   return saveTopic({ name, content: 'Plants convert light into energy.', source: 'paste' });
@@ -125,7 +134,7 @@ test('POST /api/topics with source "search" but no query returns 400', async () 
 });
 
 test('POST /api/upload with no file returns 400', async () => {
-  const res = await fetch(base + '/api/upload', { method: 'POST', body: new FormData() });
+  const res = await req('/api/upload', { method: 'POST', body: new FormData() });
   assert.equal(res.status, 400);
   assert.ok((await res.json()).error);
 });
@@ -258,7 +267,7 @@ test('a deleted session reports 404 to lookups and to answers recorded against i
   assert.equal((await get(`/api/sessions/${s.id}`)).status, 200);
   assert.equal((await patch(`/api/sessions/${s.id}`, { correct: true, timeMs: 10 })).status, 200);
 
-  await fetch(`${base}/api/sessions/${s.id}`, { method: 'DELETE' });
+  await del(`/api/sessions/${s.id}`);
   const lookup = await get(`/api/sessions/${s.id}`);
   assert.equal(lookup.status, 404);
   assert.equal((await lookup.json()).code, 'SESSION_NOT_FOUND');
