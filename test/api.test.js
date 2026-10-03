@@ -540,6 +540,51 @@ test('GET /api/export/db returns a real SQLite file containing the newest writes
     'snapshot is missing a row written just before the export (WAL not checkpointed)');
 });
 
+// ── data import ─────────────────────────────────────────────────────────────
+// Both export shapes must come back in through the one route. The suite's
+// own database is the import target, so a row is deleted first to prove the
+// import really restored it rather than finding it still there.
+
+const upload = (bytes, name) => {
+  const body = new FormData();
+  body.append('file', new Blob([bytes]), name);
+  return req('/api/import', { method: 'POST', body });
+};
+
+for (const [label, route, name] of [['JSON export', '/api/export', 'export.json'], ['database backup', '/api/export/db', 'backup.db']]) {
+  test(`POST /api/import restores a deleted topic and its questions from a ${label}`, async () => {
+    const topic = seedTopic(`Round Trip ${label}`);
+    saveQuestions(topic.id, [{ question: 'Restored Q', answer: 'Restored A', type: 'short' }]);
+    const file = Buffer.from(await (await get(route)).arrayBuffer());
+
+    assert.equal((await del(`/api/topics/${topic.id}`)).status, 200);
+    assert.equal((await get(`/api/topics/${topic.id}`)).status, 404);
+
+    const res = await upload(file, name);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.imported.topics, 1);
+    assert.equal(body.imported.questions, 1);
+
+    const restored = await (await get(`/api/topics/${topic.id}`)).json();
+    assert.equal(restored.name, `Round Trip ${label}`);
+    assert.equal(restored.content, 'Plants convert light into energy.');
+
+    // Second time round there is nothing left to add.
+    const again = await (await upload(file, name)).json();
+    assert.ok(Object.values(again.imported).every(n => n === 0), 'a repeat import must not duplicate anything');
+  });
+}
+
+test('POST /api/import rejects a file that is not an export, with a 400 and a message', async () => {
+  for (const bytes of ['not json at all', JSON.stringify({ hello: 'world' })]) {
+    const res = await upload(bytes, 'junk.json');
+    assert.equal(res.status, 400);
+    assert.ok((await res.json()).error);
+  }
+  assert.equal((await req('/api/import', { method: 'POST', body: new FormData() })).status, 400);
+});
+
 test('the export carries no API key — secrets live in config.json, not the database', async () => {
   const res = await get('/api/export');
   const raw = await res.text();

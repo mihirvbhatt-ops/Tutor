@@ -27,6 +27,9 @@ const DB_PATH = process.env.TUTOR_DB_PATH || path.join(__dirname, 'tutor.db');
 
 let db;
 let backend; // 'better-sqlite3' | 'sql.js'
+// Whichever engine constructor initDb() ended up with — kept so an uploaded
+// backup file can be opened with the same engine (see readSnapshot()).
+let Engine;
 
 const SCHEMA_SQL = `
     CREATE TABLE IF NOT EXISTS topics (
@@ -156,6 +159,7 @@ export async function initDb() {
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
     backend = 'better-sqlite3';
+    Engine = Database;
     db.exec(SCHEMA_SQL);
     runMigrations();
     seedIfEmpty();
@@ -171,6 +175,7 @@ export async function initDb() {
       ? new SQL.Database(fs.readFileSync(DB_PATH))
       : new SQL.Database();
     backend = 'sql.js';
+    Engine = SQL.Database;
     db.run(`PRAGMA journal_mode = WAL;`);
     db.run(SCHEMA_SQL);
     runMigrations();
@@ -944,9 +949,8 @@ export function getStatsSummary() {
 //                        diffable, and useful to anything that isn't this
 //                        app. Lossy in one direction only: it captures the
 //                        data, not the schema.
-//   exportDbSnapshot() — a byte-for-byte SQLite file. Restoring is "replace
-//                        tutor.db and restart", with no import path to write
-//                        and no chance of a partial reconstruction.
+//   exportDbSnapshot() — a byte-for-byte SQLite file: schema and data
+//                        together, exactly as the app itself stores them.
 //
 // The table list is explicit rather than read from sqlite_master so that a
 // future internal/cache table doesn't silently start appearing in what we
@@ -998,6 +1002,153 @@ export function exportDbSnapshot() {
   } finally {
     fs.rmSync(tmp, { force: true });
   }
+}
+
+// ── Import / restore ─────────────────────────────────────────────────────────
+// Reads back either shape the export above produces — the JSON file or the
+// SQLite backup — and merges it into the live database. Merge, not replace:
+// a row whose id is already here is left exactly as it is, and nothing is
+// ever deleted, so importing can't lose work done since the file was made
+// and importing the same file twice changes nothing the second time.
+
+// Thrown for anything wrong with the file itself (as opposed to a bug here),
+// so the route can answer 400 with a message worth showing the user.
+export class ImportError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'ImportError';
+    this.status = 400;
+    this.code = 'IMPORT_INVALID';
+  }
+}
+
+// Integer AUTOINCREMENT ids mean nothing outside the database that assigned
+// them — attempt #12 in the file and attempt #12 here are unrelated rows. So
+// these tables are matched on their content instead, and take a fresh id.
+const AUTO_ID_TABLES = new Set(['attempts', 'history']);
+
+const SQLITE_MAGIC = Buffer.from('SQLite format 3\0', 'latin1');
+
+function readSnapshot(buffer) {
+  // A tutor.db copied by hand (rather than via "Download backup") has its
+  // header's read/write version bytes set to "WAL" by the native backend,
+  // and a WAL database can't be opened from memory — there's no -wal file to
+  // go with it. Marking the copy as a plain rollback-journal file reads
+  // everything that had been checkpointed into the main file.
+  const bytes = Buffer.from(buffer);
+  bytes[18] = 1;
+  bytes[19] = 1;
+
+  let snap;
+  try {
+    snap = new Engine(bytes);
+    const all = sql => {
+      if (backend === 'better-sqlite3') return snap.prepare(sql).all();
+      const stmt = snap.prepare(sql);
+      try {
+        const rows = [];
+        while (stmt.step()) rows.push(stmt.getAsObject());
+        return rows;
+      } finally {
+        stmt.free();
+      }
+    };
+    const present = new Set(all(`SELECT name FROM sqlite_master WHERE type = 'table'`).map(r => r.name));
+    if (!present.has('topics')) throw new ImportError('That database file is not an AI Tutor backup.');
+    const data = {};
+    // A backup from an older version may predate some tables entirely.
+    for (const table of EXPORT_TABLES) data[table] = present.has(table) ? all(`SELECT * FROM ${table}`) : [];
+    return { schemaVersion: all('PRAGMA user_version')[0].user_version, data };
+  } catch (err) {
+    if (err instanceof ImportError) throw err;
+    throw new ImportError('That backup file could not be read as a database — it may be damaged or incomplete.');
+  } finally {
+    snap?.close();
+  }
+}
+
+function readJsonExport(buffer) {
+  let parsed;
+  try {
+    parsed = JSON.parse(buffer.toString('utf8'));
+  } catch {
+    throw new ImportError('That file is neither an AI Tutor JSON export nor a database backup.');
+  }
+  if (parsed?.format !== 'ai-tutor-export' || typeof parsed.data !== 'object' || parsed.data === null) {
+    throw new ImportError('That JSON file is not an AI Tutor export.');
+  }
+  if (parsed.version !== EXPORT_FORMAT_VERSION) {
+    throw new ImportError(`This export uses format version ${parsed.version}, which this version of the app cannot read.`);
+  }
+  for (const table of EXPORT_TABLES) {
+    const rows = parsed.data[table] ?? [];
+    const valid = Array.isArray(rows) && rows.every(row =>
+      row && typeof row === 'object' && !Array.isArray(row) &&
+      Object.values(row).every(v => v === null || typeof v === 'string' || typeof v === 'number'));
+    if (!valid) throw new ImportError(`The "${table}" section of that export is not in the expected shape.`);
+  }
+  return { schemaVersion: Number(parsed.schemaVersion) || 0, data: parsed.data };
+}
+
+// A fresh install seeds one demo topic under a newly generated id, so
+// restoring onto a new machine would leave two copies of it side by side —
+// the untouched local one and the studied one from the file. If the local
+// copy is the only thing here and has never been used, the file's wins.
+function dropUntouchedSeed(data) {
+  const topics = query(`SELECT id, name, source FROM topics`);
+  if (topics.length !== 1 || topics[0].source !== 'seed') return;
+  const [seed] = topics;
+  const incoming = (data.topics ?? []).some(t => t.source === 'seed' && t.name === seed.name && t.id !== seed.id);
+  if (!incoming) return;
+  const { used } = query(`SELECT (SELECT COUNT(*) FROM attempts) + (SELECT COUNT(*) FROM sessions)
+                               + (SELECT COUNT(*) FROM course_topics) AS used`)[0];
+  if (!used) deleteTopic(seed.id);
+}
+
+export function importData(buffer) {
+  const isDb = buffer.subarray(0, SQLITE_MAGIC.length).equals(SQLITE_MAGIC);
+  const { schemaVersion, data } = isDb ? readSnapshot(buffer) : readJsonExport(buffer);
+
+  // Older files are fine (columns added since just take their defaults);
+  // a newer one may carry columns or meanings this version doesn't know.
+  if (schemaVersion > getUserVersion()) {
+    throw new ImportError('This file was made by a newer version of AI Tutor. Update the app, then import it again.');
+  }
+
+  const imported = {};
+  const skipped = {};
+  withTransaction(() => {
+    dropUntouchedSeed(data);
+    for (const table of EXPORT_TABLES) {
+      const rows = data[table] ?? [];
+      const autoId = AUTO_ID_TABLES.has(table);
+      const known = query(`PRAGMA table_info(${table})`).map(c => c.name).filter(c => !(autoId && c === 'id'));
+      const before = query(`SELECT COUNT(*) AS c FROM ${table}`)[0].c;
+
+      for (const row of rows) {
+        // Column names only ever come from this database's own schema; the
+        // file contributes values, never SQL.
+        const cols = known.filter(c => Object.hasOwn(row, c));
+        if (!cols.length) continue;
+        const values = cols.map(c => row[c]);
+        const marks = cols.map(() => '?').join(', ');
+        if (autoId) {
+          run(`INSERT INTO ${table} (${cols.join(', ')}) SELECT ${marks}
+               WHERE NOT EXISTS (SELECT 1 FROM ${table} WHERE ${cols.map(c => `${c} IS ?`).join(' AND ')})`,
+            [...values, ...values]);
+        } else {
+          run(`INSERT OR IGNORE INTO ${table} (${cols.join(', ')}) VALUES (${marks})`, values);
+        }
+      }
+
+      imported[table] = query(`SELECT COUNT(*) AS c FROM ${table}`)[0].c - before;
+      skipped[table] = rows.length - imported[table];
+    }
+    // Same rename migration #2 applies to a database of that age.
+    if (schemaVersion < 2) run(`UPDATE questions SET type = 'short' WHERE type = 'open'`);
+  });
+
+  return { source: isDb ? 'db' : 'json', imported, skipped };
 }
 
 function courseTopicsWithProgress(courseId) {

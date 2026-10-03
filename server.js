@@ -35,7 +35,7 @@ import {
   startSession, getSession, recordSessionAnswer, endSession, deleteSession, listSessions, getStatsSummary,
   saveExplanation, getExplanation,
   saveSearchCache, listSearchCacheQueries, getSearchCache,
-  exportAll, exportDbSnapshot
+  exportAll, exportDbSnapshot, importData, ImportError
 } from './db/sqlite.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1125,6 +1125,22 @@ app.get('/api/export/db', (req, res) => {
   const snapshot = exportDbSnapshot();
   res.setHeader('Content-Disposition', `attachment; filename="${exportFilename('db')}"`);
   res.type('application/octet-stream').send(snapshot);
+});
+
+// Takes back either file the two routes above hand out — importData() tells
+// them apart by content, not by filename. Multipart rather than a JSON body
+// because a backup is binary, and because a real library's export is far
+// past express.json's 2mb limit.
+const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
+
+app.post('/api/import', importUpload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  try {
+    res.json(importData(req.file.buffer));
+  } catch (err) {
+    if (err instanceof ImportError) return res.status(400).json({ error: err.message, code: err.code });
+    throw err;
+  }
 });
 
 // ── Settings: AI provider / API key (roadmap #3) ────────────────────────────

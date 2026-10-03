@@ -36,7 +36,9 @@ Ollama.
 - **Stats** — accuracy trends over time, streaks, and a session history,
   per topic or overall
 - **Your data, portable** — export everything as readable JSON or download
-  the database file itself as a backup, from Settings → Your Data
+  the database file itself as a backup, and import either one back (on this
+  machine or another), from Settings → Your Data. Import only adds what's
+  missing: nothing already in your library is changed or removed
 - **Update notice** — the app checks GitHub for a newer release and says so
   in Settings
 - **Installable PWA** with offline shell caching

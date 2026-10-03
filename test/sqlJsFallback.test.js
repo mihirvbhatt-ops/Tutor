@@ -160,3 +160,34 @@ test('exportDbSnapshot() on sql.js returns real SQLite bytes containing current 
   assert.equal(buf.subarray(0, 15).toString('utf8'), 'SQLite format 3');
   assert.ok(buf.includes(Buffer.from('Snapshot Marker Topic', 'utf8')));
 });
+
+// ── import ───────────────────────────────────────────────────────────────────
+// Someone restoring by hand may pick tutor.db itself rather than a
+// "Download backup" file — and the native backend leaves that file marked
+// WAL-mode, which sql.js can't open as-is. Built with better-sqlite3
+// directly so this is that real file.
+test('importData reads a JSON export, a backup, and a WAL-mode tutor.db written by the native backend', async () => {
+  const topic = freshTopic({ name: 'Import Round Trip' });
+  db.saveQuestions(topic.id, [{ question: 'Q', answer: 'A', type: 'short' }]);
+  const json = Buffer.from(JSON.stringify(db.exportAll()));
+  const backup = db.exportDbSnapshot();
+
+  const { default: Database } = await import('better-sqlite3');
+  const nativePath = `${TEST_DB}.native`;
+  fs.rmSync(nativePath, { force: true });
+  fs.writeFileSync(nativePath, backup);
+  const native = new Database(nativePath);
+  native.pragma('journal_mode = WAL');
+  native.close();
+  const walFile = fs.readFileSync(nativePath);
+  for (const suffix of ['', '-wal', '-shm']) fs.rmSync(nativePath + suffix, { force: true });
+  assert.equal(walFile[18], 2, 'sanity check: the file really is marked WAL-mode');
+
+  for (const file of [json, backup, walFile]) {
+    db.deleteTopic(topic.id);
+    const { imported } = db.importData(file);
+    assert.equal(imported.topics, 1);
+    assert.equal(imported.questions, 1);
+    assert.equal(db.getTopic(topic.id).name, 'Import Round Trip');
+  }
+});

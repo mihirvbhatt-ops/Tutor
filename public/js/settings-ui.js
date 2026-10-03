@@ -433,6 +433,50 @@ get('btn-export-db').addEventListener('click', () =>
   )
 );
 
+// ── Data import ─────────────────────────────────────────────────────────────
+// One button for both file types: the server works out which it was given.
+function describeImport({ imported }) {
+  const total = Object.values(imported).reduce((a, b) => a + b, 0);
+  if (!total) return '✓ Nothing new — everything in that file is already here.';
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const parts = [plural(imported.topics, 'topic'), plural(imported.questions, 'question'), plural(imported.sessions, 'session')];
+  return `✓ Imported ${parts.join(', ')}. Reloading…`;
+}
+
+async function importDataFile(file) {
+  const statusEl = get('export-status');
+  const buttons = [get('btn-export-json'), get('btn-export-db'), get('btn-import-data')];
+  buttons.forEach(b => (b.disabled = true));
+  statusEl.classList.remove('ok', 'err');
+  statusEl.textContent = 'Importing…';
+
+  try {
+    const body = new FormData();
+    body.append('file', file);
+    const res = await fetch('/api/import', { method: 'POST', body });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Could not import that file.');
+    statusEl.classList.add('ok');
+    statusEl.textContent = describeImport(data);
+    // Library, courses and stats were all rendered from the old data; a
+    // reload is the one refresh that can't miss a panel.
+    if (Object.values(data.imported).some(Boolean)) setTimeout(() => location.reload(), 1500);
+  } catch (err) {
+    statusEl.classList.add('err');
+    statusEl.textContent = err.message || 'Could not import that file.';
+  } finally {
+    buttons.forEach(b => (b.disabled = false));
+  }
+}
+
+get('btn-import-data').addEventListener('click', () => get('import-file').click());
+get('import-file').addEventListener('change', e => {
+  const [file] = e.target.files;
+  // Cleared so picking the same file again still fires `change`.
+  e.target.value = '';
+  if (file) importDataFile(file);
+});
+
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 // roadmap #18 — the previous hand-rolled regex parser had no support for
 // code fences, tables, links, or nested lists, and its paragraph-wrapping
