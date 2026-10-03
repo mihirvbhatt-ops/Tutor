@@ -2,7 +2,7 @@
 # AI Tutor installer & updater (roadmap #4).
 #
 # Fresh install:
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/mihirvbhatt-ops/Tutor/main/install.sh | bash
 #
 # Re-running against an existing install pulls the latest release and
 # reinstalls dependencies instead of cloning again — the same script doubles
@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-REPO_URL="https://github.com/OWNER/REPO.git"
+REPO_URL="https://github.com/mihirvbhatt-ops/Tutor.git"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/ai-tutor}"
 
 log()  { printf '\033[1;36m==>\033[0m %s\n' "$1"; }
